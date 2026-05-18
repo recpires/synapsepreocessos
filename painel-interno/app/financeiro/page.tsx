@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import PainelShell from '@/components/PainelShell'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, Legend,
@@ -509,13 +509,11 @@ function DespesasView({ despesas, onDelete, onAdd }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FinanceiroPage() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [despesas, setDespesas]   = useState<Despesa[]>([])
   const [loading, setLoading]     = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
-  const [userEmail, setUserEmail] = useState('')
   const [aba, setAba]             = useState<'dashboard' | 'despesas'>('dashboard')
   const [mesGlobal, setMesGlobal] = useState('geral')
 
@@ -528,13 +526,7 @@ export default function FinanceiroPage() {
 
   useEffect(() => {
     fetchDespesas()
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ''))
-  }, [fetchDespesas, supabase])
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
+  }, [fetchDespesas])
 
   async function handleSave(d: DespesaInsert) {
     await supabase.from('despesas').insert(d)
@@ -559,28 +551,8 @@ export default function FinanceiroPage() {
   const totalGeral = despesas.reduce((s, d) => s + Number(d.valor), 0)
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
-      {/* Header */}
-      <header className="border-b border-[#1e1e2e] bg-[#111118] sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <span className="font-semibold text-white text-sm">Synapse Code</span>
-            <span className="text-gray-600">/</span>
-            <span className="text-gray-400 text-sm">Financeiro</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-500 text-xs hidden sm:block">{userEmail}</span>
-            <button onClick={handleLogout} className="text-xs text-gray-500 hover:text-white transition-colors">Sair</button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+    <PainelShell>
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         {/* Título + controles */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -639,9 +611,9 @@ export default function FinanceiroPage() {
         ) : (
           <DespesasView despesas={despesas} onDelete={handleDelete} onAdd={() => setModalOpen(true)} />
         )}
-      </main>
+      </div>
 
       <ModalDespesa open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleSave} />
-    </div>
+    </PainelShell>
   )
 }

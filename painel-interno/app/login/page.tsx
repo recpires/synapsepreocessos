@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -25,7 +26,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/financeiro')
+    router.push('/overview')
     router.refresh()
   }
 
@@ -34,11 +35,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-violet-600 mb-4">
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+          <div className="inline-flex items-center justify-center mb-4">
+            <Image src="/logo.png" alt="Synapse Code" width={56} height={56} className="rounded-xl" />
           </div>
           <h1 className="text-xl font-bold text-white">Synapse Code</h1>
           <p className="text-gray-500 text-sm mt-1">Painel Interno</p>
