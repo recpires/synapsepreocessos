@@ -1,0 +1,5 @@
+git-push.bat
+*.tmp
+*.log
+.DS_Store
+Thumbs.db

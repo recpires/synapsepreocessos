@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synapse Code — Hub Operacional</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0f8;
+    --muted: #8888a8;
+    --accent: #7c6ef7;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --pink: #f472b6;
+    --orange: #fb923c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 12px; color: var(--muted); }
+  .header-date { font-size: 13px; color: var(--muted); }
+
+  /* NAV TABS */
+  .nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .nav-btn {
+    padding: 12px 18px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .nav-btn:hover { color: var(--text); }
+  .nav-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* MAIN */
+  .main { padding: 32px; max-width: 1200px; margin: 0 auto; }
+
+  /* SECTION */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+    .grid-5 { grid-template-columns: 1fr 1fr; }
+    .main { padding: 20px; }
+    .header { padding: 16px 20px; }
+    .nav { padding: 0 20px; }
+  }
+
+  /* CARD */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* STAT */
+  .stat-value { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+  .stat-label { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+  /* BADGE */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .badge-green { background: rgba(52,211,153,0.12); color: var(--green); }
+  .badge-yellow { background: rgba(251,191,36,0.12); color: var(--yellow); }
+  .badge-red { background: rgba(248,113,113,0.12); color: var(--red); }
+  .badge-blue { background: rgba(96,165,250,0.12); color: var(--blue); }
+  .badge-purple { background: rgba(167,139,250,0.12); color: var(--accent2); }
+  .badge-orange { background: rgba(251,146,60,0.12); color: var(--orange); }
+
+  /* PRODUCT CARD */
+  .product-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    transition: border-color 0.15s;
+  }
+  .product-card:hover { border-color: var(--border2); }
+  .product-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .product-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+  .product-stack { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+  .stack-tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(124,110,247,0.12);
+    color: var(--accent2);
+    font-weight: 500;
+  }
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .progress-label { font-size: 11px; color: var(--muted); margin-top: 5px; display: flex; justify-content: space-between; }
+
+  /* PROCESS CARD */
+  .process-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+    display: block;
+  }
+  .process-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .process-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+  .process-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .process-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .process-files { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+  .process-file {
+    font-size: 11px;
+    color: var(--accent2);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .process-file::before { content: '→'; }
+
+  /* TASK LIST */
+  .task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .task-item:last-child { border-bottom: none; }
+  .task-check {
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--border2);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .task-check.done {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .task-check.done::after { content: '✓'; font-size: 10px; color: white; }
+  .task-text { flex: 1; line-height: 1.4; }
+  .task-text.done { text-decoration: line-through; color: var(--muted); }
+  .task-area {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  /* SPRINT BOARD */
+  .sprint-col {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .sprint-col-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sprint-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    cursor: default;
+    transition: border-color 0.15s;
+  }
+  .sprint-item:hover { border-color: var(--border2); }
+  .sprint-item-title { font-weight: 500; margin-bottom: 4px; line-height: 1.4; }
+  .sprint-item-meta { color: var(--muted); font-size: 11px; display: flex; align-items: center; gap: 6px; }
+
+  /* FUNNEL */
+  .funnel-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .funnel-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .funnel-text { flex: 1; }
+  .funnel-action { font-size: 11px; color: var(--muted); }
+
+  /* TEAM */
+  .team-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .avatar {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .team-name { font-size: 15px; font-weight: 600; }
+  .team-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .section-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+  /* PRIORITY ROW */
+  .priority-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .priority-row:last-child { border-bottom: none; }
+  .priority-rank {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .rank-1 { background: rgba(251,191,36,0.2); color: var(--yellow); }
+  .rank-2 { background: rgba(148,163,184,0.15); color: #94a3b8; }
+  .rank-3 { background: rgba(251,146,60,0.15); color: var(--orange); }
+  .rank-4 { background: rgba(96,165,250,0.1); color: var(--blue); }
+  .rank-5 { background: rgba(167,139,250,0.1); color: var(--accent2); }
+
+  /* SCORE BAR */
+  .score-bar { flex: 1; }
+  .score-track { height: 4px; background: var(--border); border-radius: 2px; }
+  .score-fill { height: 4px; border-radius: 2px; background: var(--accent); }
+  .score-num { font-size: 12px; font-weight: 600; color: var(--accent2); width: 30px; text-align: right; }
+
+  /* ICP CARD */
+  .icp-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .icp-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+  .icp-item { font-size: 12px; color: var(--muted); padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
+  .icp-item:last-child { border-bottom: none; }
+  .icp-item strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">Synapse Code</div>
+      <div class="logo-sub">Hub Operacional</div>
+    </div>
+  </div>
+  <div class="header-date" id="date-display"></div>
+</header>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showSection('overview')">Visão Geral</button>
+  <button class="nav-btn" onclick="showSection('produtos')">Produtos</button>
+  <button class="nav-btn" onclick="showSection('dev')">Desenvolvimento</button>
+  <button class="nav-btn" onclick="showSection('comercial')">Comercial</button>
+  <button class="nav-btn" onclick="showSection('marketing')">Marketing</button>
+  <button class="nav-btn" onclick="showSection('financeiro')">Financeiro</button>
+  <button class="nav-btn" onclick="showSection('time')">Time</button>
+  <button class="nav-btn" onclick="showSection('processos')">Processos</button>
+</nav>
+
+<main class="main">
+
+  <!-- VISÃO GERAL -->
+  <section class="section active" id="section-overview">
+    <div class="section-title">Bom dia, Rodrigo 👋</div>
+    <div class="section-sub">Sinapse Code · Software House · 2 pessoas · 5 produtos ativos</div>
+
+    <div class="grid-3" style="margin-bottom:20px">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Produtos ativos</div>
+        <div class="stat-value">5</div>
+        <div class="stat-label">Nero Barber · Psi Aura · CRM Nexio · Kubic Eng · Arquetipos</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Foco atual</div>
+        <div class="stat-value" style="font-size:22px;padding-top:4px">Nero Barber</div>
+        <div class="stat-label">Sprint 1 · Estabilização + Marketing</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Processos documentados</div>
+        <div class="stat-value">5</div>
+        <div class="stat-label">Dev · Comercial · Marketing · Financeiro · Time</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Prioridade dos produtos</div>
+        <div class="priority-row">
+          <div class="priority-rank rank-1">1</div>
+          <div style="flex:1"><div style="font-weight:500">Nero Barber</div><div style="font-size:11px;color:var(--muted)">Mais maduro · sprint ativa</div></div>
+          <div class="score-bar"><div class="score-track"><div class="score-fill" style="width:82%"></div></div></div>
+          <div class="score-num">4.1</div>
+        </div>
+        <div class="priority-row">
+          <div class="priority-rank rank-2">2</div>
+          <div style="flex:1"><div style="font-weight:500">Psi Aura</div><div style="font-size:11px;color:var(--muted)">Precisa atenção técnica</div></div>
+          <div class="score-bar"><div class="score-track"><div class="score-fill" style="width:65%"></div></div></div>
+          <div class="score-num">3.3</div>
+        </div>
+        <div class="priority-row">
+          <div class="priority-rank rank-3">3</div>
+          <div style="flex:1"><div style="font-weight:500">CRM Nexio</div><div style="font-size:11px;color:var(--muted)">MVP em andamento</div></div>
+          <div class="score-bar"><div class="score-track"><div class="score-fill" style="width:56%"></div></div></div>
+          <div class="score-num">2.8</div>
+        </div>
+        <div class="priority-row">
+          <div class="priority-rank rank-4">4</div>
+          <div style="flex:1"><div style="font-weight:500">Kubic Eng</div><div style="font-size:11px;color:var(--muted)">Validar com clientes</div></div>
+          <div class="score-bar"><div class="score-track"><div class="score-fill" style="width:52%"></div></div></div>
+          <div class="score-num">2.6</div>
+        </div>
+        <div class="priority-row">
+          <div class="priority-rank rank-5">5</div>
+          <div style="flex:1"><div style="font-weight:500">Arquetipos App</div><div style="font-size:11px;color:var(--muted)">Definir escopo primeiro</div></div>
+          <div class="score-bar"><div class="score-track"><div class="score-fill" style="width:40%"></div></div></div>
+          <div class="score-num">2.0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Próximas ações prioritárias</div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div class="task-text">Configurar pipeline no CRM Nexio com estágios do processo de vendas</div>
+          <span class="badge badge-blue task-area">Comercial</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div class="task-text">Gravar primeiros 4 Reels do Nero Barber (semana 1 do calendário)</div>
+          <span class="badge badge-purple task-area">Marketing</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div class="task-text">Sprint 1: revisar onboarding do cliente no Nero Barber</div>
+          <span class="badge badge-green task-area">Dev</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div class="task-text">Mapear MRR atual e custos fixos mensais</div>
+          <span class="badge badge-yellow task-area">Financeiro</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div class="task-text">Formalizar reunião semanal com Wilian (dia e hora fixos)</div>
+          <span class="badge badge-orange task-area">Time</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div class="task-text">Definir setor e público-alvo do Arquetipos App</div>
+          <span class="badge badge-green task-area">Dev</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUTOS -->
+  <section class="section" id="section-produtos">
+    <div class="section-title">Produtos</div>
+    <div class="section-sub">5 SaaS ativos — stack Next.js · Supabase · Flutter · .NET · Python</div>
+    <div class="grid-5">
+      <div class="product-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="font-size:22px">💈</div>
+          <span class="badge badge-green">Maduro</span>
+        </div>
+        <div class="product-name">Nero Barber</div>
+        <div class="product-desc">SaaS para barbearias — agendamento, gestão de clientes e serviços</div>
+        <div class="product-stack">
+          <span class="stack-tag">Next.js</span>
+          <span class="stack-tag">Supabase</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div>
+        <div class="progress-label"><span>Maturidade</span><span>80%</span></div>
+      </div>
+      <div class="product-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="font-size:22px">🧠</div>
+          <span class="badge badge-yellow">Atenção</span>
+        </div>
+        <div class="product-name">Psi Aura</div>
+        <div class="product-desc">SaaS para psicólogos — agenda, prontuários e gestão de pacientes</div>
+        <div class="product-stack">
+          <span class="stack-tag">Next.js</span>
+          <span class="stack-tag">PostgreSQL</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:55%"></div></div>
+        <div class="progress-label"><span>Maturidade</span><span>55%</span></div>
+      </div>
+      <div class="product-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="font-size:22px">📊</div>
+          <span class="badge badge-blue">Em dev</span>
+        </div>
+        <div class="product-name">CRM Nexio</div>
+        <div class="product-desc">CRM próprio — gestão de leads, pipeline e relacionamento</div>
+        <div class="product-stack">
+          <span class="stack-tag">React</span>
+          <span class="stack-tag">Node.js</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:40%"></div></div>
+        <div class="progress-label"><span>Maturidade</span><span>40%</span></div>
+      </div>
+      <div class="product-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="font-size:22px">🏗️</div>
+          <span class="badge badge-yellow">Atenção</span>
+        </div>
+        <div class="product-name">Kubic Eng</div>
+        <div class="product-desc">SaaS para engenharia — gestão de obras, custos e equipes</div>
+        <div class="product-stack">
+          <span class="stack-tag">.NET</span>
+          <span class="stack-tag">C#</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:45%"></div></div>
+        <div class="progress-label"><span>Maturidade</span><span>45%</span></div>
+      </div>
+      <div class="product-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="font-size:22px">🌀</div>
+          <span class="badge badge-purple">Novo</span>
+        </div>
+        <div class="product-name">Arquetipos App</div>
+        <div class="product-desc">Novo SaaS em desenvolvimento — setor e escopo a definir</div>
+        <div class="product-stack">
+          <span class="stack-tag">A definir</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:15%"></div></div>
+        <div class="progress-label"><span>Maturidade</span><span>15%</span></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="card" style="margin-top:0">
+      <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Stack da Synapse Code</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <span class="badge badge-blue">Next.js</span>
+        <span class="badge badge-blue">React</span>
+        <span class="badge badge-blue">Node.js</span>
+        <span class="badge badge-green">Supabase</span>
+        <span class="badge badge-green">PostgreSQL</span>
+        <span class="badge badge-purple">Flutter</span>
+        <span class="badge badge-purple">React Native</span>
+        <span class="badge badge-yellow">Python</span>
+        <span class="badge badge-yellow">Django</span>
+        <span class="badge badge-orange">.NET</span>
+        <span class="badge badge-orange">C#</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEV -->
+  <section class="section" id="section-dev">
+    <div class="section-title">Desenvolvimento</div>
+    <div class="section-sub">Sprint de 2 semanas · Foco rotativo por produto · Regra 60/20/20</div>
+
+    <div class="grid-2" style="margin-bottom:20px">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Sprint atual — Nero Barber</div>
+        <div class="sprint-col" style="background:transparent;border:none;padding:0">
+          <div class="sprint-item">
+            <div class="sprint-item-title">Revisar onboarding do cliente (primeiro acesso)</div>
+            <div class="sprint-item-meta"><span class="badge badge-yellow">M</span> Em andamento</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-item-title">Preparar infra para aumento de usuários</div>
+            <div class="sprint-item-meta"><span class="badge badge-yellow">M</span> A fazer</div>
+          </div>
+          <div class="sprint-item">
+            <div class="sprint-item-title">Testes de staging antes do marketing ativo</div>
+            <div class="sprint-item-meta"><span class="badge badge-blue">P</span> A fazer</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Roadmap — próximas sprints</div>
+        <div class="task-item"><div class="task-check done"></div><div class="task-text done">Criar processo de desenvolvimento</div></div>
+        <div class="task-item"><div class="task-check done"></div><div class="task-text done">Matriz de priorização de produtos</div></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Sprint 2 — Psi Aura (auditoria LGPD + débito técnico)</div></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Sprint 3 — CRM Nexio (pipeline kanban + contatos)</div></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Sprint 4 — Kubic Eng (validar com clientes piloto)</div></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Sprint 5 — Arquetipos App (definir escopo + MVP)</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Fluxo de trabalho padrão</div>
+      <div style="display:flex;gap:0;overflow-x:auto">
+        <div class="funnel-step" style="border-radius:10px 0 0 10px;border-right:none;flex:1;min-width:120px">
+          <div class="funnel-num">1</div><div class="funnel-text"><div style="font-weight:500">Backlog</div><div class="funnel-action">ideia ou bug registrado</div></div>
+        </div>
+        <div class="funnel-step" style="border-radius:0;border-right:none;flex:1;min-width:120px">
+          <div class="funnel-num">2</div><div class="funnel-text"><div style="font-weight:500">Planejamento</div><div class="funnel-action">priorizado na sprint</div></div>
+        </div>
+        <div class="funnel-step" style="border-radius:0;border-right:none;flex:1;min-width:120px">
+          <div class="funnel-num">3</div><div class="funnel-text"><div style="font-weight:500">Dev</div><div class="funnel-action">feature branch</div></div>
+        </div>
+        <div class="funnel-step" style="border-radius:0;border-right:none;flex:1;min-width:120px">
+          <div class="funnel-num">4</div><div class="funnel-text"><div style="font-weight:500">Staging</div><div class="funnel-action">revisão + testes</div></div>
+        </div>
+        <div class="funnel-step" style="border-radius:0 10px 10px 0;flex:1;min-width:120px">
+          <div class="funnel-num">5</div><div class="funnel-text"><div style="font-weight:500">Produção</div><div class="funnel-action">deploy + comunicado</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMERCIAL -->
+  <section class="section" id="section-comercial">
+    <div class="section-title">Comercial</div>
+    <div class="section-sub">Processo de vendas · ICP por produto · Scripts de prospecção</div>
+
+    <div class="grid-2" style="margin-bottom:20px">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Funil de vendas</div>
+        <div class="funnel-step"><div class="funnel-num">1</div><div class="funnel-text"><div style="font-weight:500">Lead gerado</div><div class="funnel-action">Responder em até 2h · Registrar no CRM</div></div></div>
+        <div class="funnel-step"><div class="funnel-num">2</div><div class="funnel-text"><div style="font-weight:500">Qualificação (5–10 min)</div><div class="funnel-action">Negócio · Problema · Prazo · Sistema atual</div></div></div>
+        <div class="funnel-step"><div class="funnel-num">3</div><div class="funnel-text"><div style="font-weight:500">Apresentação (30–45 min)</div><div class="funnel-action">Demo ao vivo · Levantar objeções · Definir próximo passo</div></div></div>
+        <div class="funnel-step"><div class="funnel-num">4</div><div class="funnel-text"><div style="font-weight:500">Proposta (em 24h)</div><div class="funnel-action">Problema · Solução · Investimento · Próximos passos</div></div></div>
+        <div class="funnel-step"><div class="funnel-num">5</div><div class="funnel-text"><div style="font-weight:500">Follow-up (+1, +3, +7 dias)</div><div class="funnel-action">WhatsApp ativo · Nunca deixar esfriar</div></div></div>
+        <div class="funnel-step"><div class="funnel-num">6</div><div class="funnel-text"><div style="font-weight:500">Fechamento + Onboarding</div><div class="funnel-action">Ativação · Contrato · Boas-vindas</div></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>ICP por produto</div>
+        <div class="icp-card" style="margin-bottom:10px">
+          <div class="icp-title">💈 Nero Barber</div>
+          <div class="icp-item"><strong>Quem:</strong> Dono de barbearia 1–3 cadeiras</div>
+          <div class="icp-item"><strong>Dor:</strong> Agenda pelo WhatsApp, perde horário</div>
+          <div class="icp-item"><strong>Canal:</strong> Instagram · Google Maps</div>
+        </div>
+        <div class="icp-card" style="margin-bottom:10px">
+          <div class="icp-title">🧠 Psi Aura</div>
+          <div class="icp-item"><strong>Quem:</strong> Psicólogo autônomo, 10–30 pacientes/semana</div>
+          <div class="icp-item"><strong>Dor:</strong> Sem prontuário digital, inadimplência</div>
+          <div class="icp-item"><strong>Canal:</strong> Instagram · Grupos Facebook</div>
+        </div>
+        <div class="icp-card">
+          <div class="icp-title">📊 CRM Nexio · 🏗️ Kubic · 🤖 Agentes IA</div>
+          <div class="icp-item"><strong>Canal:</strong> LinkedIn · Prospecção fria direta</div>
+          <div class="icp-item"><strong>Perfil:</strong> Pequenas empresas B2B</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Tarefas comerciais pendentes</div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Configurar pipeline no CRM Nexio com os estágios definidos</div><span class="badge badge-red task-area">Urgente</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Definir precificação oficial dos SaaS (planos + valores)</div><span class="badge badge-yellow task-area">Alta</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Iniciar prospecção ativa: 10 contatos/semana no Nero Barber</div><span class="badge badge-yellow task-area">Alta</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Criar template de proposta (SaaS e projeto)</div><span class="badge badge-blue task-area">Média</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Criar processo de onboarding de novos clientes</div><span class="badge badge-blue task-area">Média</span></div>
+    </div>
+  </section>
+
+  <!-- MARKETING -->
+  <section class="section" id="section-marketing">
+    <div class="section-title">Marketing</div>
+    <div class="section-sub">Foco inicial: Nero Barber · Instagram + LinkedIn · Calendário 30 dias ativo</div>
+
+    <div class="grid-2" style="margin-bottom:20px">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--pink)"></span>Calendário Nero Barber — semana 1</div>
+        <div class="sprint-item"><div class="sprint-item-title">Seg · Reels — "Seu cliente ainda agenda pelo WhatsApp?"</div><div class="sprint-item-meta"><span class="badge badge-purple">Reels</span> Gancho + solução em 30s</div></div>
+        <div class="sprint-item"><div class="sprint-item-title">Ter · Carrossel — 5 problemas que toda barbearia tem</div><div class="sprint-item-meta"><span class="badge badge-blue">Carrossel</span> Educativo · gera salvamento</div></div>
+        <div class="sprint-item"><div class="sprint-item-title">Qui · Reels — Demo ao vivo: agendamento em 3 cliques</div><div class="sprint-item-meta"><span class="badge badge-purple">Reels</span> Demo do produto</div></div>
+        <div class="sprint-item"><div class="sprint-item-title">Sex · Stories — Enquete sobre horários perdidos</div><div class="sprint-item-meta"><span class="badge badge-orange">Stories</span> Engajamento + lead quente</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Pilares de conteúdo</div>
+        <div class="task-item"><div style="width:32px;height:32px;border-radius:8px;background:rgba(124,110,247,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">📚</div><div class="task-text"><strong>Educação (40%)</strong> — Como resolver problemas do nicho com tech</div></div>
+        <div class="task-item"><div style="width:32px;height:32px;border-radius:8px;background:rgba(52,211,153,0.12);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">⭐</div><div class="task-text"><strong>Prova social (30%)</strong> — Resultados, antes/depois, números reais</div></div>
+        <div class="task-item"><div style="width:32px;height:32px;border-radius:8px;background:rgba(96,165,250,0.12);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🛠️</div><div class="task-text"><strong>Produto (20%)</strong> — Demos, features, atualizações dos SaaS</div></div>
+        <div class="task-item"><div style="width:32px;height:32px;border-radius:8px;background:rgba(251,191,36,0.1);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🎬</div><div class="task-text"><strong>Bastidores (10%)</strong> — Como a Synapse Code trabalha</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Tarefas de marketing pendentes</div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Otimizar bio e perfil do Instagram da Synapse Code</div><span class="badge badge-red task-area">Urgente</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Gravar primeiros 4 Reels do Nero Barber (semana 1)</div><span class="badge badge-red task-area">Urgente</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Ativar LinkedIn pessoal do Rodrigo com 3 posts/semana</div><span class="badge badge-yellow task-area">Alta</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Criar LP dedicada para Nero Barber com CTA de trial</div><span class="badge badge-yellow task-area">Alta</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Replicar calendário de conteúdo para Psi Aura (mês 2)</div><span class="badge badge-blue task-area">Média</span></div>
+      <div class="task-item"><div class="task-check"></div><div class="task-text">Criar LPs para Psi Aura, CRM Nexio e Kubic Eng</div><span class="badge badge-blue task-area">Média</span></div>
+    </div>
+  </section>
+
+  <!-- FINANCEIRO -->
+  <section class="section" id="section-financeiro">
+    <div class="section-title">Financeiro</div>
+    <div class="section-sub">Modelo híbrido: MRR (SaaS) + projetos pontuais · Meta: aumentar % recorrente</div>
+
+    <div class="grid-3" style="margin-bottom:20px">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>MRR atual</div>
+        <div class="stat-value" style="color:var(--muted)">— mapear</div>
+        <div class="stat-label">Soma das assinaturas ativas de todos os SaaS</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Custos fixos</div>
+        <div class="stat-value" style="color:var(--muted)">— mapear</div>
+        <div class="stat-label">Infra · ferramentas · domínios · contador</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Churn mensal</div>
+        <div class="stat-value" style="color:var(--muted)">— mapear</div>
+        <div class="stat-label">Meta: manter abaixo de 5%</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Precificação de referência</div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead>
+            <tr style="color:var(--muted)">
+              <th style="text-align:left;padding:8px 0;border-bottom:1px solid var(--border)">Produto</th>
+              <th style="padding:8px;border-bottom:1px solid var(--border)">Básico</th>
+              <th style="padding:8px;border-bottom:1px solid var(--border)">Pro</th>
+              <th style="padding:8px 0;border-bottom:1px solid var(--border)">Premium</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)">💈 Nero Barber</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">R$79</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">R$149</td><td style="padding:8px 0;text-align:center;border-bottom:1px solid var(--border)">R$249</td></tr>
+            <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)">🧠 Psi Aura</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">R$69</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">R$129</td><td style="padding:8px 0;text-align:center;border-bottom:1px solid var(--border)">R$199</td></tr>
+            <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)">📊 CRM Nexio</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">R$99</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">R$199</td><td style="padding:8px 0;text-align:center;border-bottom:1px solid var(--border)">R$349</td></tr>
+            <tr><td style="padding:8px 0">🏗️ Kubic Eng</td><td style="padding:8px;text-align:center">R$149</td><td style="padding:8px;text-align:center">R$299</td><td style="padding:8px 0;text-align:center">R$499</td></tr>
+          </tbody>
+        </table>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px">* Valores de referência — validar com clientes</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Ações financeiras urgentes</div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Mapear MRR atual de cada SaaS</div><span class="badge badge-red task-area">Urgente</span></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Listar todos os custos fixos mensais</div><span class="badge badge-red task-area">Urgente</span></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Definir pró-labore mensal fixo</div><span class="badge badge-yellow task-area">Alta</span></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Validar tabela de preços com clientes atuais</div><span class="badge badge-yellow task-area">Alta</span></div>
+        <div class="task-item"><div class="task-check"></div><div class="task-text">Verificar tipo de empresa (MEI não suporta SaaS multi-cliente)</div><span class="badge badge-orange task-area">Importante</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIME -->
+  <section class="section" id="section-time">
+    <div class="section-title">Time</div>
+    <div class="section-sub">2 pessoas · Reunião semanal · Crescimento planejado</div>
+
+    <div class="grid-2" style="margin-bottom:20px">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="team-card">
+          <div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--accent2))">R</div>
+          <div>
+            <div class="team-name">Rodrigo Eufrasio</div>
+            <div class="team-role">Dev / CTO · Arquitetura · Produto · Desenvolvimento</div>
+          </div>
+          <span class="badge badge-purple" style="margin-left:auto">CTO</span>
+        </div>
+        <div class="team-card">
+          <div class="avatar" style="background:linear-gradient(135deg,var(--green),var(--blue))">W</div>
+          <div>
+            <div class="team-name">Wilian Andre</div>
+            <div class="team-role">CEO · Negócio · Comercial · Gestão</div>
+          </div>
+          <span class="badge badge-green" style="margin-left:auto">CEO</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--orange)"></span>Próximas contratações</div>
+        <div class="task-item"><div style="font-size:16px;flex-shrink:0">👨‍💻</div><div class="task-text"><strong>Dev frontend</strong> — quando Rodrigo estiver 80%+ no backend</div><span class="badge badge-yellow task-area">Próximo</span></div>
+        <div class="task-item"><div style="font-size:16px;flex-shrink:0">🎧</div><div class="task-text"><strong>CS / Suporte</strong> — quando tiver +30 clientes ativos</div><span class="badge badge-blue task-area">Futuro</span></div>
+        <div class="task-item"><div style="font-size:16px;flex-shrink:0">🎨</div><div class="task-text"><strong>Designer UI/UX</strong> — quando visual virar gargalo de conversão</div><span class="badge badge-blue task-area">Futuro</span></div>
+        <div class="task-item"><div style="font-size:16px;flex-shrink:0">📞</div><div class="task-text"><strong>SDR (vendas)</strong> — quando o processo comercial estiver validado</div><span class="badge badge-blue task-area">Futuro</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Ritual semanal mínimo</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px">
+          <div style="font-size:20px;margin-bottom:8px">📅</div>
+          <div style="font-weight:600;font-size:13px;margin-bottom:4px">Segunda-feira</div>
+          <div style="font-size:12px;color:var(--muted)">Reunião de 15 min — Rodrigo + Wilian. O que foi feito, o que vai ser feito, bloqueios.</div>
+        </div>
+        <div style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px">
+          <div style="font-size:20px;margin-bottom:8px">🔍</div>
+          <div style="font-weight:600;font-size:13px;margin-bottom:4px">Sexta-feira</div>
+          <div style="font-size:12px;color:var(--muted)">Review rápida: o que foi entregue, o que travou, ajuste de prioridade se necessário.</div>
+        </div>
+        <div style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px">
+          <div style="font-size:20px;margin-bottom:8px">📊</div>
+          <div style="font-weight:600;font-size:13px;margin-bottom:4px">Dia 1 do mês</div>
+          <div style="font-size:12px;color:var(--muted)">Review financeiro: MRR, custos, churn, meta do próximo mês.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROCESSOS -->
+  <section class="section" id="section-processos">
+    <div class="section-title">Processos documentados</div>
+    <div class="section-sub">Todos os playbooks operacionais da Synapse Code</div>
+
+    <div class="grid-3">
+      <div class="process-card">
+        <div class="process-icon" style="background:rgba(52,211,153,0.12)">🛠️</div>
+        <div class="process-title">Desenvolvimento</div>
+        <div class="process-desc">Sprints de 2 semanas, foco rotativo, fluxo de tarefas e DoD.</div>
+        <div class="process-files">
+          <span class="process-file">processo-de-desenvolvimento.md</span>
+          <span class="process-file">priorizacao-produtos.md</span>
+          <span class="process-file">roadmap-overview.md</span>
+        </div>
+      </div>
+      <div class="process-card">
+        <div class="process-icon" style="background:rgba(96,165,250,0.12)">💼</div>
+        <div class="process-title">Comercial</div>
+        <div class="process-desc">Funil de 7 etapas, ICP por produto, scripts de prospecção fria.</div>
+        <div class="process-files">
+          <span class="process-file">processo-de-vendas.md</span>
+          <span class="process-file">icp-por-produto.md</span>
+          <span class="process-file">script-prospeccao-frio.md</span>
+        </div>
+      </div>
+      <div class="process-card">
+        <div class="process-icon" style="background:rgba(244,114,182,0.12)">📣</div>
+        <div class="process-title">Marketing</div>
+        <div class="process-desc">Estratégia por canal, calendário 30 dias Nero Barber, guia LinkedIn.</div>
+        <div class="process-files">
+          <span class="process-file">estrategia-geral.md</span>
+          <span class="process-file">calendario-nero-barber-30dias.md</span>
+          <span class="process-file">guia-linkedin.md</span>
+        </div>
+      </div>
+      <div class="process-card">
+        <div class="process-icon" style="background:rgba(251,191,36,0.12)">💰</div>
+        <div class="process-title">Financeiro</div>
+        <div class="process-desc">Controle de MRR, custos, precificação dos SaaS e rituais mensais.</div>
+        <div class="process-files">
+          <span class="process-file">controle-financeiro.md</span>
+        </div>
+      </div>
+      <div class="process-card">
+        <div class="process-icon" style="background:rgba(251,146,60,0.12)">👥</div>
+        <div class="process-title">Time / RH</div>
+        <div class="process-desc">Comunicação interna, onboarding de membros e plano de contratações.</div>
+        <div class="process-files">
+          <span class="process-file">processos-internos.md</span>
+        </div>
+      </div>
+      <div class="process-card" style="border-style:dashed;opacity:0.6">
+        <div class="process-icon" style="background:rgba(167,139,250,0.12)">➕</div>
+        <div class="process-title">Adicionar processo</div>
+        <div class="process-desc">Peça ao Claude para documentar um novo processo operacional.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('section-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  document.querySelectorAll('.task-check:not(.done)').forEach(btn => {
+    btn.addEventListener('click', function() {
+      this.classList.toggle('checked');
+      if (this.classList.contains('checked')) {
+        this.style.background = 'var(--accent)';
+        this.style.borderColor = 'var(--accent)';
+        this.innerHTML = '<span style="font-size:10px;color:white">✓</span>';
+        this.nextElementSibling && this.nextElementSibling.classList.add('done');
+      } else {
+        this.style.background = '';
+        this.style.borderColor = '';
+        this.innerHTML = '';
+        this.nextElementSibling && this.nextElementSibling.classList.remove('done');
+      }
+    });
+  });
+
+  const d = new Date();
+  const days = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const months = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  document.getElementById('date-display').textContent =
+    days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+</script>
+</body>
+</html>

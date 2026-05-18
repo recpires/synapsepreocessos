@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financeiro — Synapse Code</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0a0a0f; --bg2: #111118; --bg3: #1a1a24;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #f0f0f8; --muted: #8888a8;
+    --accent: #7c6ef7; --accent2: #a78bfa;
+    --green: #34d399; --yellow: #fbbf24; --red: #f87171;
+    --blue: #60a5fa; --orange: #fb923c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* SETUP SCREEN */
+  #setup-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px;
+  }
+  .setup-card {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 16px; padding: 36px; width: 100%; max-width: 480px;
+  }
+  .setup-logo { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+  .setup-sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .setup-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .setup-input {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 10px 14px; color: var(--text);
+    font-size: 14px; font-family: monospace; margin-bottom: 16px; outline: none;
+  }
+  .setup-input:focus { border-color: var(--accent); }
+  .setup-btn {
+    width: 100%; background: var(--accent); color: white; border: none;
+    border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: opacity 0.15s;
+  }
+  .setup-btn:hover { opacity: 0.85; }
+  .setup-hint { font-size: 12px; color: var(--muted); margin-top: 14px; line-height: 1.6; }
+
+  /* MAIN APP */
+  #app { display: none; }
+  .header {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .header-title { font-size: 16px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--muted); }
+  .btn-add { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; }
+  .btn-add:hover { opacity: 0.85; }
+
+  .main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  @media(max-width:800px){ .stats { grid-template-columns: 1fr 1fr; } }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .stat-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-value { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* FILTERS */
+  .filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .filter-select {
+    background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px;
+    padding: 7px 12px; color: var(--text); font-size: 13px; font-family: inherit; outline: none; cursor: pointer;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+  .filter-btn { background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; padding: 7px 14px; color: var(--muted); font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .filter-btn.active { background: rgba(124,110,247,0.15); border-color: var(--accent); color: var(--accent2); }
+
+  /* TABLE */
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 12px 16px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); background: var(--bg3); }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .td-valor { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .td-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 4px; }
+  .td-btn:hover { color: var(--red); background: rgba(248,113,113,0.1); }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-infra { background: rgba(96,165,250,0.12); color: var(--blue); }
+  .badge-ia { background: rgba(167,139,250,0.12); color: var(--accent2); }
+  .badge-hw { background: rgba(251,146,60,0.12); color: var(--orange); }
+  .badge-tax { background: rgba(248,113,113,0.12); color: var(--red); }
+  .badge-mkt { background: rgba(52,211,153,0.12); color: var(--green); }
+  .badge-tool { background: rgba(251,191,36,0.12); color: var(--yellow); }
+  .badge-edu { background: rgba(167,139,250,0.12); color: var(--accent2); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 200;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 28px; width: 100%; max-width: 500px; }
+  .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-full { grid-column: 1/-1; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; }
+  .form-input, .form-select {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 9px 12px; color: var(--text);
+    font-size: 13px; font-family: inherit; outline: none;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .btn-cancel { background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 9px 18px; color: var(--muted); font-size: 13px; cursor: pointer; font-family: inherit; }
+  .btn-save { background: var(--accent); border: none; border-radius: 8px; padding: 9px 20px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-cancel:hover { border-color: var(--border2); color: var(--text); }
+
+  /* EMPTY / LOADING */
+  .empty { text-align: center; padding: 48px; color: var(--muted); }
+  .loading { text-align: center; padding: 32px; color: var(--muted); font-size: 14px; }
+
+  /* ALERT SUPABASE */
+  .alert-banner {
+    background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;
+    font-size: 13px; color: var(--yellow); display: none;
+  }
+  .alert-banner.show { display: block; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">⚡ Synapse Code</div>
+    <div class="setup-sub">Controle Financeiro — configuração inicial</div>
+    <div class="setup-label">Supabase URL</div>
+    <input class="setup-input" id="sb-url" placeholder="https://xxxx.supabase.co" />
+    <div class="setup-label">Supabase Anon Key</div>
+    <input class="setup-input" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIs..." />
+    <button class="setup-btn" onclick="conectar()">Conectar ao Supabase →</button>
+    <div class="setup-hint">
+      Encontre esses dados em: <strong>Supabase → Project Settings → API</strong><br>
+      As credenciais ficam salvas no navegador — não precisa inserir de novo.
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="header-title">Financeiro</div>
+        <div class="header-sub">Synapse Code</div>
+      </div>
+    </div>
+    <button class="btn-add" onclick="abrirModal()">+ Nova despesa</button>
+  </header>
+
+  <main class="main">
+    <div class="alert-banner" id="alert-supabase">
+      ⚠️ Modo demonstração — dados não estão sendo salvos. Configure o Supabase para persistência.
+    </div>
+
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total registrado</div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-sub">todas as despesas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Custo fixo/mês</div>
+        <div class="stat-value" id="stat-fixo">—</div>
+        <div class="stat-sub">recorrentes mensais</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Maior gasto</div>
+        <div class="stat-value" id="stat-maior">—</div>
+        <div class="stat-sub" id="stat-maior-nome">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🔴 Alerta Supabase</div>
+        <div class="stat-value" style="color:var(--yellow)" id="stat-supabase">—</div>
+        <div class="stat-sub">custo crescendo 4x em 2 meses</div>
+      </div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filters">
+      <select class="filter-select" id="filter-mes" onchange="filtrar()">
+        <option value="">Todos os meses</option>
+        <option value="2026-01">Jan 2026</option>
+        <option value="2026-02">Fev 2026</option>
+        <option value="2026-03">Mar 2026</option>
+        <option value="2026-04">Abr 2026</option>
+        <option value="2026-05">Mai 2026</option>
+      </select>
+      <select class="filter-select" id="filter-cat" onchange="filtrar()">
+        <option value="">Todas as categorias</option>
+        <option value="Infraestrutura">Infraestrutura</option>
+        <option value="IA / APIs">IA / APIs</option>
+        <option value="Ferramentas">Ferramentas</option>
+        <option value="Hardware">Hardware</option>
+        <option value="Marketing">Marketing</option>
+        <option value="Impostos">Impostos</option>
+        <option value="Educação">Educação</option>
+      </select>
+      <select class="filter-select" id="filter-tipo" onchange="filtrar()">
+        <option value="">Todos os tipos</option>
+        <option value="fixo">Fixo</option>
+        <option value="variavel">Variável</option>
+        <option value="pontual">Pontual</option>
+      </select>
+      <button class="filter-btn active" id="btn-todos" onclick="setView('todos')">Todos</button>
+      <button class="filter-btn" id="btn-recorrentes" onclick="setView('recorrentes')">Só recorrentes</button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Produto</th>
+            <th>Condição</th>
+            <th>Valor</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tabela-body">
+          <tr><td colspan="7" class="loading">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL NOVA DESPESA -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title">Nova despesa</div>
+    <div class="form-grid">
+      <div>
+        <div class="form-label">Data</div>
+        <input class="form-input" type="date" id="f-data" />
+      </div>
+      <div>
+        <div class="form-label">Valor (R$)</div>
+        <input class="form-input" type="number" step="0.01" id="f-valor" placeholder="0,00" />
+      </div>
+      <div class="form-full">
+        <div class="form-label">Descrição</div>
+        <input class="form-input" type="text" id="f-desc" placeholder="Ex: Supabase, Claude AI..." />
+      </div>
+      <div>
+        <div class="form-label">Categoria</div>
+        <select class="form-select" id="f-cat">
+          <option value="Infraestrutura">Infraestrutura</option>
+          <option value="IA / APIs">IA / APIs</option>
+          <option value="Ferramentas">Ferramentas</option>
+          <option value="Hardware">Hardware</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Impostos">Impostos</option>
+          <option value="Educação">Educação</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+      <div>
+        <div class="form-label">Produto</div>
+        <select class="form-select" id="f-produto">
+          <option value="Geral">Geral</option>
+          <option value="Nero Barber">Nero Barber</option>
+          <option value="Psi Aura">Psi Aura</option>
+          <option value="CRM Nexio">CRM Nexio</option>
+          <option value="Kubic Eng">Kubic Eng</option>
+          <option value="Arquetipos App">Arquetipos App</option>
+          <option value="Agentes IA">Agentes IA</option>
+          <option value="Design">Design</option>
+        </select>
+      </div>
+      <div>
+        <div class="form-label">Forma de pagamento</div>
+        <select class="form-select" id="f-pgto">
+          <option value="Cartão Santander">Cartão Santander</option>
+          <option value="PIX">PIX</option>
+          <option value="Débito">Débito</option>
+          <option value="Itaú">Itaú</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+      <div>
+        <div class="form-label">Condição</div>
+        <select class="form-select" id="f-cond">
+          <option value="Mensal">Mensal</option>
+          <option value="Anual">Anual</option>
+          <option value="Parcelado">Parcelado</option>
+          <option value="Única">Única</option>
+          <option value="IOF">IOF</option>
+        </select>
+      </div>
+      <div>
+        <div class="form-label">Tipo</div>
+        <select class="form-select" id="f-tipo">
+          <option value="fixo">Fixo</option>
+          <option value="variavel">Variável</option>
+          <option value="pontual">Pontual</option>
+        </select>
+      </div>
+      <div class="form-full" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="f-recorrente" style="width:16px;height:16px;accent-color:var(--accent)" />
+        <label for="f-recorrente" style="font-size:13px;color:var(--muted)">Despesa recorrente (aparece todo mês)</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarDespesa()">Salvar despesa</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'synapse_sb_config';
+let sb = null;
+let todasDespesas = [];
+let viewMode = 'todos';
+
+// Dados locais (fallback sem Supabase)
+const dadosLocais = [
+  {id:'1', data:'2026-01-28', descricao:'Supabase', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:138.83, tipo:'variavel', recorrente:true},
+  {id:'2', data:'2026-01-30', descricao:'Figma', categoria:'Ferramentas', produto:'Design', forma_pagamento:'Cartão Santander', condicao:'Anual', valor:1057.34, tipo:'fixo', recorrente:true},
+  {id:'3', data:'2026-02-02', descricao:'Supabase', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:105.94, tipo:'variavel', recorrente:true},
+  {id:'4', data:'2026-02-02', descricao:'Vercel', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:110.87, tipo:'fixo', recorrente:true},
+  {id:'5', data:'2026-03-01', descricao:'Supabase', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:57.89, tipo:'variavel', recorrente:true},
+  {id:'6', data:'2026-03-02', descricao:'Vercel / Gemini', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:109.16, tipo:'fixo', recorrente:true},
+  {id:'7', data:'2026-03-06', descricao:'Placa de Vídeo 1/6', categoria:'Hardware', produto:'Geral', forma_pagamento:'Itaú', condicao:'Parcelado', valor:2562.00, tipo:'pontual', recorrente:false},
+  {id:'8', data:'2026-03-28', descricao:'Supabase', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:206.69, tipo:'variavel', recorrente:true},
+  {id:'9', data:'2026-03-28', descricao:'Eduzz', categoria:'Educação', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Única', valor:297.00, tipo:'pontual', recorrente:false},
+  {id:'10', data:'2026-04-02', descricao:'Gemini', categoria:'IA / APIs', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:109.40, tipo:'fixo', recorrente:true},
+  {id:'11', data:'2026-04-08', descricao:'Z-API (Bot Comercial)', categoria:'Ferramentas', produto:'Agentes IA', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:99.99, tipo:'fixo', recorrente:true},
+  {id:'12', data:'2026-04-08', descricao:'AP Cloud', categoria:'Infraestrutura', produto:'Agentes IA', forma_pagamento:'Cartão Santander', condicao:'Única', valor:27.36, tipo:'pontual', recorrente:false},
+  {id:'13', data:'2026-04-12', descricao:'Google One', categoria:'Ferramentas', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:96.99, tipo:'fixo', recorrente:true},
+  {id:'14', data:'2026-04-23', descricao:'Claude AI', categoria:'IA / APIs', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:583.81, tipo:'fixo', recorrente:true},
+  {id:'15', data:'2026-04-27', descricao:'Monitor', categoria:'Hardware', produto:'Geral', forma_pagamento:'PIX', condicao:'Única', valor:1000.00, tipo:'pontual', recorrente:false},
+  {id:'16', data:'2026-04-28', descricao:'Supabase', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:237.05, tipo:'variavel', recorrente:true},
+  {id:'17', data:'2026-05-01', descricao:'Google Ads', categoria:'Marketing', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:49.27, tipo:'variavel', recorrente:true},
+  {id:'18', data:'2026-05-02', descricao:'Vercel', categoria:'Infraestrutura', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:105.96, tipo:'fixo', recorrente:true},
+  {id:'19', data:'2026-05-08', descricao:'Z-API (Bot Comercial)', categoria:'Ferramentas', produto:'Agentes IA', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:99.99, tipo:'fixo', recorrente:true},
+  {id:'20', data:'2026-05-12', descricao:'SEFAZ/DARE', categoria:'Impostos', produto:'Geral', forma_pagamento:'PIX', condicao:'Única', valor:218.99, tipo:'pontual', recorrente:false},
+  {id:'21', data:'2026-05-12', descricao:'Google One', categoria:'Ferramentas', produto:'Geral', forma_pagamento:'Cartão Santander', condicao:'Mensal', valor:96.99, tipo:'fixo', recorrente:true},
+];
+
+function fmt(v) {
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function catBadge(cat) {
+  const map = {
+    'Infraestrutura':'badge-infra','IA / APIs':'badge-ia','Hardware':'badge-hw',
+    'Impostos':'badge-tax','Marketing':'badge-mkt','Ferramentas':'badge-tool','Educação':'badge-edu'
+  };
+  return `<span class="badge ${map[cat]||'badge-tool'}">${cat}</span>`;
+}
+
+function fmtData(d) {
+  const p = d.split('-');
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+function renderTabela(dados) {
+  const tbody = document.getElementById('tabela-body');
+  if (!dados.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhuma despesa encontrada</td></tr>';
+    return;
+  }
+  tbody.innerHTML = dados.sort((a,b) => b.data.localeCompare(a.data)).map(d => `
+    <tr>
+      <td>${fmtData(d.data)}</td>
+      <td><strong>${d.descricao}</strong>${d.recorrente ? ' <span style="font-size:10px;color:var(--accent2)">↺</span>' : ''}</td>
+      <td>${catBadge(d.categoria)}</td>
+      <td style="color:var(--muted);font-size:12px">${d.produto}</td>
+      <td style="color:var(--muted);font-size:12px">${d.condicao}</td>
+      <td class="td-valor" style="color:${d.tipo==='pontual'?'var(--orange)':d.tipo==='variavel'?'var(--yellow)':'var(--text)'}">${fmt(d.valor)}</td>
+      <td><button class="td-btn" onclick="deletar('${d.id}')" title="Remover">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function calcStats(dados) {
+  const total = dados.reduce((s,d) => s + Number(d.valor), 0);
+  document.getElementById('stat-total').textContent = fmt(total);
+
+  const recorrentes = dados.filter(d => d.recorrente && d.tipo !== 'pontual');
+  const fixoMes = recorrentes.reduce((s,d) => s + Number(d.valor), 0) / Math.max(1, [...new Set(recorrentes.map(d => d.data.slice(0,7)))].length);
+  document.getElementById('stat-fixo').textContent = fmt(fixoMes);
+
+  const maior = dados.reduce((max, d) => Number(d.valor) > Number(max.valor) ? d : max, dados[0]);
+  if (maior) {
+    document.getElementById('stat-maior').textContent = fmt(maior.valor);
+    document.getElementById('stat-maior-nome').textContent = maior.descricao;
+  }
+
+  const sbCosts = dados.filter(d => d.descricao.toLowerCase().includes('supabase') && d.tipo !== 'pontual');
+  const sbMeses = {};
+  sbCosts.forEach(d => {
+    const m = d.data.slice(0,7);
+    sbMeses[m] = (sbMeses[m]||0) + Number(d.valor);
+  });
+  const sbVals = Object.values(sbMeses);
+  if (sbVals.length > 0) {
+    document.getElementById('stat-supabase').textContent = fmt(sbVals[sbVals.length-1]) + '/mês';
+  }
+}
+
+function filtrar() {
+  const mes = document.getElementById('filter-mes').value;
+  const cat = document.getElementById('filter-cat').value;
+  const tipo = document.getElementById('filter-tipo').value;
+
+  let dados = [...todasDespesas];
+  if (viewMode === 'recorrentes') dados = dados.filter(d => d.recorrente);
+  if (mes) dados = dados.filter(d => d.data.startsWith(mes));
+  if (cat) dados = dados.filter(d => d.categoria === cat);
+  if (tipo) dados = dados.filter(d => d.tipo === tipo);
+
+  renderTabela(dados);
+  calcStats(dados);
+}
+
+function setView(v) {
+  viewMode = v;
+  document.getElementById('btn-todos').classList.toggle('active', v==='todos');
+  document.getElementById('btn-recorrentes').classList.toggle('active', v==='recorrentes');
+  filtrar();
+}
+
+function abrirModal() {
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  document.getElementById('modal').classList.add('open');
+}
+
+function fecharModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+async function salvarDespesa() {
+  const nova = {
+    data: document.getElementById('f-data').value,
+    descricao: document.getElementById('f-desc').value,
+    categoria: document.getElementById('f-cat').value,
+    produto: document.getElementById('f-produto').value,
+    forma_pagamento: document.getElementById('f-pgto').value,
+    condicao: document.getElementById('f-cond').value,
+    valor: parseFloat(document.getElementById('f-valor').value),
+    tipo: document.getElementById('f-tipo').value,
+    recorrente: document.getElementById('f-recorrente').checked,
+  };
+  if (!nova.descricao || !nova.valor || !nova.data) { alert('Preencha data, descrição e valor.'); return; }
+
+  if (sb) {
+    const { data, error } = await sb.from('despesas').insert([nova]).select();
+    if (!error && data) { todasDespesas.unshift(data[0]); }
+  } else {
+    nova.id = Date.now().toString();
+    todasDespesas.unshift(nova);
+  }
+  fecharModal();
+  filtrar();
+}
+
+async function deletar(id) {
+  if (!confirm('Remover esta despesa?')) return;
+  if (sb) await sb.from('despesas').delete().eq('id', id);
+  todasDespesas = todasDespesas.filter(d => d.id !== id);
+  filtrar();
+}
+
+async function conectar() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { alert('Preencha os dois campos.'); return; }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({url, key}));
+  iniciarApp(url, key);
+}
+
+async function iniciarApp(url, key) {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  if (url && key) {
+    try {
+      sb = window.supabase.createClient(url, key);
+      const { data, error } = await sb.from('despesas').select('*').order('data', {ascending:false});
+      if (!error && data && data.length > 0) {
+        todasDespesas = data;
+      } else {
+        todasDespesas = [...dadosLocais];
+        document.getElementById('alert-supabase').classList.add('show');
+      }
+    } catch(e) {
+      todasDespesas = [...dadosLocais];
+      document.getElementById('alert-supabase').classList.add('show');
+    }
+  } else {
+    todasDespesas = [...dadosLocais];
+    document.getElementById('alert-supabase').classList.add('show');
+  }
+
+  filtrar();
+}
+
+// INIT
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const {url, key} = JSON.parse(saved);
+      iniciarApp(url, key);
+      return;
+    } catch(e) {}
+  }
+  // Sem config — mostra setup
+  document.getElementById('setup-screen').style.display = 'flex';
+});
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) fecharModal();
+});
+</script>
+</body>
+</html>
