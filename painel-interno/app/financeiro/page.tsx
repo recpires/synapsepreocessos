@@ -91,12 +91,13 @@ const EMPTY_FORM: DespesaInsert = {
 }
 
 function ModalDespesa({ open, onClose, onSave }: {
-  open: boolean; onClose: () => void; onSave: (d: DespesaInsert) => Promise<void>
+  open: boolean; onClose: () => void; onSave: (d: DespesaInsert, file?: File) => Promise<void>
 }) {
   const [form, setForm] = useState<DespesaInsert>(EMPTY_FORM)
+  const [arquivo, setArquivo] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { if (open) setForm(EMPTY_FORM) }, [open])
+  useEffect(() => { if (open) { setForm(EMPTY_FORM); setArquivo(null) } }, [open])
   if (!open) return null
 
   const set = (k: keyof DespesaInsert, v: unknown) => setForm(f => ({ ...f, [k]: v }))
@@ -104,13 +105,16 @@ function ModalDespesa({ open, onClose, onSave }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await onSave(form)
+    await onSave(form, arquivo ?? undefined)
     setSaving(false)
   }
 
   const inp = `w-full bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg px-3 py-2 text-white text-sm
     focus:outline-none focus:border-violet-600 transition-colors`
   const lbl = 'block text-xs text-gray-400 mb-1'
+
+  const isPdf = arquivo?.type === 'application/pdf'
+  const isImg = arquivo?.type.startsWith('image/')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -163,6 +167,44 @@ function ModalDespesa({ open, onClose, onSave }: {
           </div>
           <div><label className={lbl}>Observação (opcional)</label>
             <input type="text" value={form.observacao || ''} onChange={e => set('observacao', e.target.value)} className={inp} /></div>
+
+          {/* Upload de comprovante */}
+          <div>
+            <label className={lbl}>Comprovante / Nota (opcional)</label>
+            <label className={`flex items-center gap-3 cursor-pointer border border-dashed rounded-lg px-4 py-3 transition-colors ${
+              arquivo ? 'border-violet-600/60 bg-violet-900/10' : 'border-[#2d2d3d] hover:border-[#3d3d4d]'
+            }`}>
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,.pdf"
+                className="hidden"
+                onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+              />
+              {arquivo ? (
+                <div className="flex items-center gap-3 w-full">
+                  <span className="text-lg">{isPdf ? '📄' : isImg ? '🖼️' : '📎'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-violet-300 truncate">{arquivo.name}</p>
+                    <p className="text-xs text-gray-500">{(arquivo.size / 1024).toFixed(0)} KB</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={e => { e.preventDefault(); setArquivo(null) }}
+                    className="text-gray-500 hover:text-red-400 transition-colors text-lg leading-none flex-shrink-0"
+                  >×</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 text-gray-500">
+                  <span className="text-xl">📎</span>
+                  <div>
+                    <p className="text-sm">Clique para anexar</p>
+                    <p className="text-xs text-gray-600">JPG, PNG, PDF · máx. 10 MB</p>
+                  </div>
+                </div>
+              )}
+            </label>
+          </div>
+
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
               className="flex-1 bg-[#1e1e2e] hover:bg-[#2d2d3d] text-gray-300 font-medium py-2.5 rounded-lg transition-colors text-sm">
@@ -464,7 +506,7 @@ function DespesasView({ despesas, onDelete, onAdd }: {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#1e1e2e]">
-                  {['Data','Descrição','Categoria','Produto','Forma','Tipo','Valor',''].map(h => (
+                  {['Data','Descrição','Categoria','Produto','Forma','Tipo','Valor','📎',''].map(h => (
                     <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -491,6 +533,17 @@ function DespesasView({ despesas, onDelete, onAdd }: {
                       <span className={`text-xs font-medium ${TIPO_CORES[d.tipo] ?? 'text-gray-400'}`}>{d.tipo}</span>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-white">{fmt(Number(d.valor))}</td>
+                    <td className="px-4 py-3 text-center">
+                      {d.anexo_url ? (
+                        <a href={d.anexo_url} target="_blank" rel="noopener noreferrer"
+                          title={d.anexo_nome ?? 'Ver anexo'}
+                          className="text-violet-400 hover:text-violet-300 transition-colors text-base">
+                          {d.anexo_nome?.endsWith('.pdf') ? '📄' : '🖼️'}
+                        </a>
+                      ) : (
+                        <span className="text-gray-700">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => onDelete(d.id)}
                         className="text-gray-600 hover:text-red-400 transition-colors text-base">×</button>
@@ -528,8 +581,26 @@ export default function FinanceiroPage() {
     fetchDespesas()
   }, [fetchDespesas])
 
-  async function handleSave(d: DespesaInsert) {
-    await supabase.from('despesas').insert(d)
+  async function handleSave(d: DespesaInsert, file?: File) {
+    let anexo_url: string | undefined
+    let anexo_nome: string | undefined
+
+    if (file) {
+      const ext = file.name.split('.').pop()
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('financeiro-anexos')
+        .upload(path, file, { contentType: file.type, upsert: false })
+      if (!uploadError && uploadData) {
+        const { data: urlData } = supabase.storage
+          .from('financeiro-anexos')
+          .getPublicUrl(uploadData.path)
+        anexo_url = urlData.publicUrl
+        anexo_nome = file.name
+      }
+    }
+
+    await supabase.from('despesas').insert({ ...d, anexo_url, anexo_nome })
     setModalOpen(false)
     fetchDespesas()
   }

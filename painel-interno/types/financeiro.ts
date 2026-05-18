@@ -10,6 +10,8 @@ export type Despesa = {
   tipo: 'fixo' | 'variavel' | 'pontual'
   recorrente: boolean
   observacao?: string
+  anexo_url?: string
+  anexo_nome?: string
   created_at: string
   created_by: string
 }
