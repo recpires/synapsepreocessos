@@ -24,15 +24,15 @@ const fmt = (v: number) =>
 const fmtK = (v: number) =>
   v >= 1000 ? `R$${(v / 1000).toFixed(1)}k` : `R$${v.toFixed(0)}`
 
-const MESES_LABEL = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-const MESES_FULL  = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+const MESES_FULL  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 function mesAtual() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-const CHART_COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16', '#f97316']
+const CHART_COLORS = ['#7c3aed','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16','#f97316']
 
 const TIPO_CORES: Record<string, string> = {
   fixo:     'text-blue-400',
@@ -56,7 +56,11 @@ function KpiCard({ label, value, sub, color = 'text-white', alert }: {
 
 // ─── Tooltip customizado ──────────────────────────────────────────────────────
 
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; fill?: string }[]; label?: string }) {
+function ChartTooltip({ active, payload, label }: {
+  active?: boolean
+  payload?: { name: string; value: number; fill?: string }[]
+  label?: string
+}) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-[#1e1e2e] border border-[#2d2d3d] rounded-lg px-3 py-2 text-sm shadow-xl">
@@ -175,8 +179,9 @@ function ModalDespesa({ open, onClose, onSave }: {
 
 // ─── Dashboard View ───────────────────────────────────────────────────────────
 
-function DashboardView({ despesas }: { despesas: Despesa[] }) {
-  // Gastos por mês
+function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: string }) {
+  const isGeral = periodo === 'geral'
+
   const porMes = Array.from(
     despesas.reduce((map, d) => {
       const mes = d.data.slice(0, 7)
@@ -186,12 +191,11 @@ function DashboardView({ despesas }: { despesas: Despesa[] }) {
   ).sort(([a], [b]) => a.localeCompare(b)).map(([mes, total]) => ({
     name: MESES_LABEL[parseInt(mes.split('-')[1]) - 1],
     total,
-    fixo: despesas.filter(d => d.data.startsWith(mes) && d.tipo === 'fixo').reduce((s, d) => s + Number(d.valor), 0),
+    fixo:     despesas.filter(d => d.data.startsWith(mes) && d.tipo === 'fixo').reduce((s, d) => s + Number(d.valor), 0),
     variavel: despesas.filter(d => d.data.startsWith(mes) && d.tipo === 'variavel').reduce((s, d) => s + Number(d.valor), 0),
-    pontual: despesas.filter(d => d.data.startsWith(mes) && d.tipo === 'pontual').reduce((s, d) => s + Number(d.valor), 0),
+    pontual:  despesas.filter(d => d.data.startsWith(mes) && d.tipo === 'pontual').reduce((s, d) => s + Number(d.valor), 0),
   }))
 
-  // Por categoria
   const porCategoria = Array.from(
     despesas.reduce((map, d) => {
       map.set(d.categoria, (map.get(d.categoria) || 0) + Number(d.valor))
@@ -199,7 +203,6 @@ function DashboardView({ despesas }: { despesas: Despesa[] }) {
     }, new Map<string, number>())
   ).sort(([, a], [, b]) => b - a).map(([name, value]) => ({ name, value }))
 
-  // Por produto
   const porProduto = Array.from(
     despesas.reduce((map, d) => {
       map.set(d.produto, (map.get(d.produto) || 0) + Number(d.valor))
@@ -207,41 +210,80 @@ function DashboardView({ despesas }: { despesas: Despesa[] }) {
     }, new Map<string, number>())
   ).sort(([, a], [, b]) => b - a).map(([name, value]) => ({ name, value }))
 
-  // KPIs
-  const total = despesas.reduce((s, d) => s + Number(d.valor), 0)
-  const mesAtualStr = mesAtual()
-  const totalMesAtual = despesas.filter(d => d.data.startsWith(mesAtualStr)).reduce((s, d) => s + Number(d.valor), 0)
-  const custoFixo = despesas.filter(d => d.recorrente && d.data.startsWith(mesAtualStr)).reduce((s, d) => s + Number(d.valor), 0)
+  const total        = despesas.reduce((s, d) => s + Number(d.valor), 0)
+  const totalFixo    = despesas.filter(d => d.tipo === 'fixo').reduce((s, d) => s + Number(d.valor), 0)
+  const totalVar     = despesas.filter(d => d.tipo === 'variavel').reduce((s, d) => s + Number(d.valor), 0)
+  const totalPontual = despesas.filter(d => d.tipo === 'pontual').reduce((s, d) => s + Number(d.valor), 0)
+  const custoFixoRec = despesas.filter(d => d.recorrente).reduce((s, d) => s + Number(d.valor), 0)
   const supabaseCusto = despesas.filter(d => d.descricao.toLowerCase().includes('supabase')).reduce((s, d) => s + Number(d.valor), 0)
   const maiorCategoria = porCategoria[0]
+
+  const labelPeriodo = isGeral ? 'acumulado' : 'no período'
 
   return (
     <div className="space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Geral" value={fmt(total)} sub={`${despesas.length} lançamentos`} />
-        <KpiCard label={`Mês atual (${MESES_LABEL[new Date().getMonth()]})`} value={fmt(totalMesAtual)} sub="todos os tipos" />
-        <KpiCard label="Custo fixo mensal" value={fmt(custoFixo)} sub="apenas recorrentes" color="text-blue-400" />
-        <KpiCard label="Supabase acumulado" value={fmt(supabaseCusto)} sub="atenção: crescimento 4×" alert />
+        <KpiCard
+          label={`Total ${labelPeriodo}`}
+          value={fmt(total)}
+          sub={`${despesas.length} lançamentos`}
+        />
+        <KpiCard
+          label={isGeral ? 'Custo fixo recorrente' : 'Custo fixo'}
+          value={fmt(custoFixoRec)}
+          sub="apenas recorrentes"
+          color="text-blue-400"
+        />
+        <KpiCard
+          label="Gastos variáveis"
+          value={fmt(totalVar)}
+          sub={`Pontuais: ${fmt(totalPontual)}`}
+          color="text-yellow-400"
+        />
+        <KpiCard
+          label="Supabase"
+          value={fmt(supabaseCusto)}
+          sub={isGeral ? 'cresceu 4× em 2 meses' : 'no período'}
+          alert={supabaseCusto > 150}
+        />
       </div>
 
-      {/* Gastos por mês + Categoria */}
+      {/* Bar mensal + donut categoria */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Bar chart mensal */}
         <div className="lg:col-span-2 bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
-          <h3 className="text-sm font-medium text-gray-300 mb-4">Gastos por mês</h3>
+          <h3 className="text-sm font-medium text-gray-300 mb-4">
+            {isGeral ? 'Gastos por mês' : 'Distribuição no mês'}
+          </h3>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={porMes} barSize={28}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1e1e2e' }} />
-              <Bar dataKey="total" fill="#7c3aed" radius={[4, 4, 0, 0]} name="Total" />
-            </BarChart>
+            {isGeral ? (
+              <BarChart data={porMes} barSize={28}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1e1e2e' }} />
+                <Bar dataKey="total" fill="#7c3aed" radius={[4, 4, 0, 0]} name="Total" />
+              </BarChart>
+            ) : (
+              <BarChart data={[
+                { name: 'Fixo', value: totalFixo, fill: '#3b82f6' },
+                { name: 'Variável', value: totalVar, fill: '#f59e0b' },
+                { name: 'Pontual', value: totalPontual, fill: '#6b7280' },
+              ]} barSize={48}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 13 }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1e1e2e' }} />
+                <Bar dataKey="value" name="Valor" radius={[4, 4, 0, 0]}>
+                  {[{ fill: '#3b82f6' }, { fill: '#f59e0b' }, { fill: '#6b7280' }].map((c, i) => (
+                    <Cell key={i} fill={c.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
 
-        {/* Donut categoria */}
         <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
           <h3 className="text-sm font-medium text-gray-300 mb-4">Por categoria</h3>
           <ResponsiveContainer width="100%" height={160}>
@@ -269,40 +311,38 @@ function DashboardView({ despesas }: { despesas: Despesa[] }) {
         </div>
       </div>
 
-      {/* Área: Fixo vs Variável vs Pontual */}
-      <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
-        <h3 className="text-sm font-medium text-gray-300 mb-4">Evolução por tipo de gasto</h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={porMes}>
-            <defs>
-              <linearGradient id="gFixo" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="gVariavel" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="gPontual" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6b7280" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#6b7280" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
-            <Tooltip content={<ChartTooltip />} />
-            <Legend wrapperStyle={{ fontSize: '12px', color: '#9ca3af' }} />
-            <Area type="monotone" dataKey="fixo" name="Fixo" stroke="#3b82f6" fill="url(#gFixo)" strokeWidth={2} />
-            <Area type="monotone" dataKey="variavel" name="Variável" stroke="#f59e0b" fill="url(#gVariavel)" strokeWidth={2} />
-            <Area type="monotone" dataKey="pontual" name="Pontual" stroke="#6b7280" fill="url(#gPontual)" strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Área evolução — só no modo geral */}
+      {isGeral && (
+        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
+          <h3 className="text-sm font-medium text-gray-300 mb-4">Evolução por tipo de gasto</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={porMes}>
+              <defs>
+                <linearGradient id="gFixo" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gVariavel" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} /><stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gPontual" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6b7280" stopOpacity={0.3} /><stop offset="95%" stopColor="#6b7280" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
+              <Tooltip content={<ChartTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '12px', color: '#9ca3af' }} />
+              <Area type="monotone" dataKey="fixo"     name="Fixo"     stroke="#3b82f6" fill="url(#gFixo)"     strokeWidth={2} />
+              <Area type="monotone" dataKey="variavel" name="Variável" stroke="#f59e0b" fill="url(#gVariavel)" strokeWidth={2} />
+              <Area type="monotone" dataKey="pontual"  name="Pontual"  stroke="#6b7280" fill="url(#gPontual)"  strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
-      {/* Por produto + últimas despesas */}
+      {/* Por produto + últimos lançamentos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Horizontal bar por produto */}
         <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
           <h3 className="text-sm font-medium text-gray-300 mb-4">Gastos por produto</h3>
           <ResponsiveContainer width="100%" height={220}>
@@ -312,17 +352,14 @@ function DashboardView({ despesas }: { despesas: Despesa[] }) {
               <YAxis type="category" dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} axisLine={false} tickLine={false} width={80} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: '#1e1e2e' }} />
               <Bar dataKey="value" name="Total" radius={[0, 4, 4, 0]}>
-                {porProduto.map((_, i) => (
-                  <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                ))}
+                {porProduto.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Últimas 5 despesas */}
         <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
-          <h3 className="text-sm font-medium text-gray-300 mb-4">Últimos lançamentos</h3>
+          <h3 className="text-sm font-medium text-gray-300 mb-4">Lançamentos do período</h3>
           <div className="space-y-3">
             {despesas.slice(0, 8).map(d => (
               <div key={d.id} className="flex items-center justify-between">
@@ -344,14 +381,13 @@ function DashboardView({ despesas }: { despesas: Despesa[] }) {
         </div>
       </div>
 
-      {/* Insight box */}
       {maiorCategoria && (
         <div className="bg-violet-900/20 border border-violet-800/40 rounded-xl p-4">
           <p className="text-sm text-violet-300">
             <span className="font-semibold">📊 Maior categoria:</span>{' '}
             <span className="font-bold">{maiorCategoria.name}</span> representa{' '}
-            <span className="font-bold">{((maiorCategoria.value / total) * 100).toFixed(1)}%</span> do total gasto ({fmt(maiorCategoria.value)}).
-            {maiorCategoria.name === 'Infraestrutura' && ' Monitore o crescimento do Supabase — subiu 4× em 2 meses.'}
+            <span className="font-bold">{((maiorCategoria.value / total) * 100).toFixed(1)}%</span> do total ({fmt(maiorCategoria.value)}).
+            {maiorCategoria.name === 'Infraestrutura' && ' Monitore o Supabase — cresceu 4× em 2 meses.'}
           </p>
         </div>
       )}
@@ -361,18 +397,18 @@ function DashboardView({ despesas }: { despesas: Despesa[] }) {
 
 // ─── Despesas View ────────────────────────────────────────────────────────────
 
-function DespesasView({
-  despesas, onDelete, onAdd,
-}: { despesas: Despesa[]; onDelete: (id: string) => void; onAdd: () => void }) {
-  const [mesFiltro, setMesFiltro] = useState(mesAtual())
-  const [catFiltro, setCatFiltro] = useState('Todas')
+function DespesasView({ despesas, onDelete, onAdd }: {
+  despesas: Despesa[]; onDelete: (id: string) => void; onAdd: () => void
+}) {
+  const [mesFiltro, setMesFiltro]   = useState('todos')
+  const [catFiltro, setCatFiltro]   = useState('Todas')
   const [tipoFiltro, setTipoFiltro] = useState('todos')
-  const [busca, setBusca] = useState('')
+  const [busca, setBusca]           = useState('')
 
   const filtradas = despesas.filter(d => {
-    const matchMes  = mesFiltro === 'todos' || d.data.startsWith(mesFiltro)
-    const matchCat  = catFiltro === 'Todas' || d.categoria === catFiltro
-    const matchTipo = tipoFiltro === 'todos' || d.tipo === tipoFiltro
+    const matchMes   = mesFiltro === 'todos'  || d.data.startsWith(mesFiltro)
+    const matchCat   = catFiltro === 'Todas'  || d.categoria === catFiltro
+    const matchTipo  = tipoFiltro === 'todos' || d.tipo === tipoFiltro
     const matchBusca = !busca ||
       d.descricao.toLowerCase().includes(busca.toLowerCase()) ||
       d.produto.toLowerCase().includes(busca.toLowerCase())
@@ -387,7 +423,6 @@ function DespesasView({
 
   return (
     <div className="space-y-4">
-      {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-center">
         <select value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} className={sel}>
           <option value="todos">Todos os meses</option>
@@ -407,10 +442,9 @@ function DespesasView({
           <option value="pontual">Pontual</option>
         </select>
         <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar…"
-          className={`${sel} w-44 placeholder-gray-600`} />
-        {(mesFiltro !== mesAtual() || catFiltro !== 'Todas' || tipoFiltro !== 'todos' || busca) && (
-          <button onClick={() => { setMesFiltro(mesAtual()); setCatFiltro('Todas'); setTipoFiltro('todos'); setBusca('') }}
+          placeholder="Buscar…" className={`${sel} w-44 placeholder-gray-600`} />
+        {(mesFiltro !== 'todos' || catFiltro !== 'Todas' || tipoFiltro !== 'todos' || busca) && (
+          <button onClick={() => { setMesFiltro('todos'); setCatFiltro('Todas'); setTipoFiltro('todos'); setBusca('') }}
             className="text-xs text-gray-500 hover:text-white transition-colors">Limpar</button>
         )}
         <div className="ml-auto flex items-center gap-3">
@@ -422,7 +456,6 @@ function DespesasView({
         </div>
       </div>
 
-      {/* Tabela */}
       <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
         {filtradas.length === 0 ? (
           <div className="flex items-center justify-center py-20 text-gray-600">Nenhuma despesa encontrada.</div>
@@ -431,7 +464,7 @@ function DespesasView({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#1e1e2e]">
-                  {['Data', 'Descrição', 'Categoria', 'Produto', 'Forma', 'Tipo', 'Valor', ''].map(h => (
+                  {['Data','Descrição','Categoria','Produto','Forma','Tipo','Valor',''].map(h => (
                     <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -460,7 +493,7 @@ function DespesasView({
                     <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-white">{fmt(Number(d.valor))}</td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => onDelete(d.id)}
-                        className="text-gray-600 hover:text-red-400 transition-colors text-base" title="Excluir">×</button>
+                        className="text-gray-600 hover:text-red-400 transition-colors text-base">×</button>
                     </td>
                   </tr>
                 ))}
@@ -479,11 +512,12 @@ export default function FinanceiroPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [despesas, setDespesas] = useState<Despesa[]>([])
-  const [loading, setLoading] = useState(true)
+  const [despesas, setDespesas]   = useState<Despesa[]>([])
+  const [loading, setLoading]     = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [userEmail, setUserEmail] = useState('')
-  const [aba, setAba] = useState<'dashboard' | 'despesas'>('dashboard')
+  const [aba, setAba]             = useState<'dashboard' | 'despesas'>('dashboard')
+  const [mesGlobal, setMesGlobal] = useState('geral')
 
   const fetchDespesas = useCallback(async () => {
     setLoading(true)
@@ -514,6 +548,16 @@ export default function FinanceiroPage() {
     fetchDespesas()
   }
 
+  // Meses disponíveis para o filtro global
+  const mesesDisponiveis = Array.from(new Set(despesas.map(d => d.data.slice(0, 7)))).sort().reverse()
+
+  // Despesas filtradas pelo mês global (usado só no Dashboard)
+  const despesasDashboard = mesGlobal === 'geral'
+    ? despesas
+    : despesas.filter(d => d.data.startsWith(mesGlobal))
+
+  const totalGeral = despesas.reduce((s, d) => s + Number(d.valor), 0)
+
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
       {/* Header */}
@@ -537,30 +581,61 @@ export default function FinanceiroPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        {/* Título + tabs */}
-        <div className="flex items-center justify-between">
+        {/* Título + controles */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">Controle Financeiro</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              {despesas.length} registros · {fmt(despesas.reduce((s, d) => s + Number(d.valor), 0))} total
+              {despesas.length} registros · {fmt(totalGeral)} total acumulado
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-[#111118] border border-[#1e1e2e] rounded-xl p-1">
-            {(['dashboard', 'despesas'] as const).map(t => (
-              <button key={t} onClick={() => setAba(t)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-                  aba === t ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}>
-                {t === 'dashboard' ? '📊 Dashboard' : '📋 Despesas'}
-              </button>
-            ))}
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Filtro de mês global — só aparece no dashboard */}
+            {aba === 'dashboard' && (
+              <div className="flex items-center gap-1 bg-[#111118] border border-[#1e1e2e] rounded-xl p-1">
+                <button
+                  onClick={() => setMesGlobal('geral')}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    mesGlobal === 'geral' ? 'bg-violet-600 text-white font-medium' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Geral
+                </button>
+                {mesesDisponiveis.map(m => {
+                  const [, mes] = m.split('-')
+                  return (
+                    <button key={m}
+                      onClick={() => setMesGlobal(m)}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                        mesGlobal === m ? 'bg-violet-600 text-white font-medium' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {MESES_LABEL[parseInt(mes) - 1]}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Abas */}
+            <div className="flex items-center gap-2 bg-[#111118] border border-[#1e1e2e] rounded-xl p-1">
+              {(['dashboard', 'despesas'] as const).map(t => (
+                <button key={t} onClick={() => setAba(t)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    aba === t ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}>
+                  {t === 'dashboard' ? '📊 Dashboard' : '📋 Despesas'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-32 text-gray-600">Carregando…</div>
         ) : aba === 'dashboard' ? (
-          <DashboardView despesas={despesas} />
+          <DashboardView despesas={despesasDashboard} periodo={mesGlobal} />
         ) : (
           <DespesasView despesas={despesas} onDelete={handleDelete} onAdd={() => setModalOpen(true)} />
         )}
