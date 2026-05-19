@@ -76,16 +76,20 @@ function ChartTooltip({ active, payload, label }: {
 
 // ─── Modal Nova Despesa ───────────────────────────────────────────────────────
 
+const PERIODICIDADES = ['Mensal', 'Quinzenal', 'Semanal', 'Anual'] as const
+
 const EMPTY_FORM: DespesaInsert = {
   data: new Date().toISOString().split('T')[0],
   descricao: '',
   categoria: 'Infraestrutura',
   produto: 'Geral',
   forma_pagamento: 'Cartão Santander',
-  condicao: 'Mensal',
+  condicao: '',
   valor: 0,
   tipo: 'fixo',
   recorrente: false,
+  periodicidade: undefined,
+  proxima_data: undefined,
   observacao: '',
   created_by: 'painel',
 }
@@ -148,7 +152,7 @@ function ModalDespesa({ open, onClose, onSave }: {
                 {FORMAS_PAGAMENTO.map(f => <option key={f}>{f}</option>)}</select></div>
             <div><label className={lbl}>Condição</label>
               <input type="text" value={form.condicao} onChange={e => set('condicao', e.target.value)}
-                placeholder="Mensal, Anual, IOF…" className={inp} /></div>
+                placeholder="IOF, parcelado…" className={inp} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Tipo</label>
@@ -157,14 +161,41 @@ function ModalDespesa({ open, onClose, onSave }: {
                 <option value="variavel">Variável</option>
                 <option value="pontual">Pontual</option>
               </select></div>
-            <div className="flex items-end pb-1">
+            <div className="flex items-end pb-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={form.recorrente}
-                  onChange={e => set('recorrente', e.target.checked)} className="w-4 h-4 accent-violet-600" />
+                  onChange={e => {
+                    set('recorrente', e.target.checked)
+                    if (!e.target.checked) {
+                      set('periodicidade', undefined)
+                      set('proxima_data', undefined)
+                    } else {
+                      set('periodicidade', 'Mensal')
+                    }
+                  }}
+                  className="w-4 h-4 accent-violet-600" />
                 <span className="text-sm text-gray-300">Recorrente</span>
               </label>
             </div>
           </div>
+
+          {/* Campos de recorrência — só aparecem quando recorrente=true */}
+          {form.recorrente && (
+            <div className="grid grid-cols-2 gap-3 bg-violet-900/10 border border-violet-800/30 rounded-lg p-3">
+              <div>
+                <label className={lbl}>Periodicidade</label>
+                <select value={form.periodicidade ?? 'Mensal'} onChange={e => set('periodicidade', e.target.value)} className={inp}>
+                  {PERIODICIDADES.map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Próxima cobrança</label>
+                <input type="date" value={form.proxima_data ?? ''}
+                  onChange={e => set('proxima_data', e.target.value || undefined)}
+                  className={inp} />
+              </div>
+            </div>
+          )}
           <div><label className={lbl}>Observação (opcional)</label>
             <input type="text" value={form.observacao || ''} onChange={e => set('observacao', e.target.value)} className={inp} /></div>
 
@@ -518,9 +549,19 @@ function DespesasView({ despesas, onDelete, onAdd }: {
                     <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
                       {new Date(d.data + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-4 py-3 text-white font-medium max-w-[200px] truncate">
-                      {d.descricao}
-                      {d.recorrente && <span className="ml-1.5 text-violet-400 text-xs">↺</span>}
+                    <td className="px-4 py-3 text-white font-medium max-w-[200px]">
+                      <span className="truncate block">{d.descricao}</span>
+                      {d.recorrente && (
+                        <span className="text-violet-400 text-[11px] flex items-center gap-1 mt-0.5">
+                          <span>↺</span>
+                          {d.periodicidade && <span>{d.periodicidade}</span>}
+                          {d.proxima_data && (
+                            <span className="text-gray-600">
+                              · próx. {new Date(d.proxima_data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${CATEGORIA_CORES[d.categoria] ?? 'bg-gray-800 text-gray-400'}`}>

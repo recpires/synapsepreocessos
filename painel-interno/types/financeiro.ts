@@ -9,6 +9,8 @@ export type Despesa = {
   valor: number
   tipo: 'fixo' | 'variavel' | 'pontual'
   recorrente: boolean
+  periodicidade?: string
+  proxima_data?: string
   observacao?: string
   anexo_url?: string
   anexo_nome?: string
