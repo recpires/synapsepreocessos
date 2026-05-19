@@ -169,7 +169,7 @@ function ModalTemplate({ open, template, onClose, onSave }: {
     e.preventDefault()
     setSaving(true)
     const campos = extrairCampos(html).map(key => ({ key, label: key.replace(/_/g, ' ') }))
-    await onSave({ nome, descricao, tipo, conteudo_html: html, campos, created_by: 'painel' })
+    await onSave({ nome, descricao, tipo, conteudo_html: html, campos })
     setSaving(false)
   }
 
