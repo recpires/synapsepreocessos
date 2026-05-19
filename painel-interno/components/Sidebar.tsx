@@ -17,7 +17,8 @@ const NAV = [
   { href: '/time',       icon: '👥', label: 'Time' },
   { href: '/processos',  icon: '📋', label: 'Processos' },
   { href: '/documentos', icon: '🗂️', label: 'Documentos' },
-  { href: '/testes',     icon: '🧪', label: 'Testes CRM' },
+  { href: '/testes',      icon: '🧪', label: 'Testes CRM' },
+  { href: '/testes/nero', icon: '💈', label: 'Testes Nero' },
 ]
 
 export default function Sidebar() {
