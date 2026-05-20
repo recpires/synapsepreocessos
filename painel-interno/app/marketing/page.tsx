@@ -151,11 +151,21 @@ export default function MarketingPage() {
   const subir = (idx: number) => moverPara(idx, idx - 1)
   const descer = (idx: number) => moverPara(idx, idx + 1)
 
-  const adicionar = () => {
+  const adicionar = (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
     const texto = novoTexto.trim()
-    if (!texto) return
+    console.log('[marketing] adicionar()', { texto, novaPrio })
+    if (!texto) {
+      console.warn('[marketing] texto vazio — nada a adicionar')
+      return
+    }
     const id = 't' + Date.now() + '-' + Math.floor(Math.random() * 1000)
-    setTarefas(prev => [{ id, texto, prio: novaPrio }, ...prev])
+    setTarefas(prev => {
+      const proxima = [{ id, texto, prio: novaPrio }, ...prev]
+      console.log('[marketing] tarefa adicionada', { id, total: proxima.length })
+      return proxima
+    })
     setNovoTexto('')
     setNovaPrio('Média')
     setDestacarId(id)
@@ -339,12 +349,11 @@ export default function MarketingPage() {
           </div>
 
           {/* Form de adicionar */}
-          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <form onSubmit={adicionar} className="flex flex-col sm:flex-row gap-2 mb-4">
             <input
               type="text"
               value={novoTexto}
               onChange={e => setNovoTexto(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') adicionar() }}
               placeholder="Adicionar nova tarefa..."
               className="flex-1 bg-[#1a1a24] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-700/60"
             />
@@ -359,13 +368,12 @@ export default function MarketingPage() {
               <option value="Baixa">Baixa</option>
             </select>
             <button
-              type="button"
-              onClick={adicionar}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors"
+              type="submit"
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
             >
               + Adicionar
             </button>
-          </div>
+          </form>
 
           {/* Ações de lista */}
           <div className="flex items-center gap-2 mb-3">
