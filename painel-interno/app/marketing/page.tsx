@@ -84,6 +84,7 @@ export default function MarketingPage() {
   const [novaPrio, setNovaPrio] = useState<Prio>('Média')
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editTexto, setEditTexto] = useState('')
+  const [destacarId, setDestacarId] = useState<string | null>(null)
   const dragIdRef = useRef<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
 
@@ -123,10 +124,12 @@ export default function MarketingPage() {
   const adicionar = () => {
     const texto = novoTexto.trim()
     if (!texto) return
-    const id = 't' + Date.now()
-    setTarefas(prev => [...prev, { id, texto, prio: novaPrio }])
+    const id = 't' + Date.now() + '-' + Math.floor(Math.random() * 1000)
+    setTarefas(prev => [{ id, texto, prio: novaPrio }, ...prev])
     setNovoTexto('')
     setNovaPrio('Média')
+    setDestacarId(id)
+    setTimeout(() => setDestacarId(null), 1500)
   }
 
   const remover = (id: string) => setTarefas(prev => prev.filter(t => t.id !== id))
@@ -296,8 +299,9 @@ export default function MarketingPage() {
               <option value="Baixa">Baixa</option>
             </select>
             <button
+              type="button"
               onClick={adicionar}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors"
             >
               + Adicionar
             </button>
@@ -306,12 +310,14 @@ export default function MarketingPage() {
           {/* Ações de lista */}
           <div className="flex items-center gap-2 mb-3">
             <button
+              type="button"
               onClick={ordenarPorPrioridade}
               className="text-[11px] px-2.5 py-1 rounded-md bg-[#1a1a24] border border-[#1e1e2e] text-gray-400 hover:text-white hover:border-[#2d2d3d] transition-colors"
             >
               Ordenar por prioridade
             </button>
             <button
+              type="button"
               onClick={resetar}
               className="text-[11px] px-2.5 py-1 rounded-md bg-[#1a1a24] border border-[#1e1e2e] text-gray-400 hover:text-white hover:border-[#2d2d3d] transition-colors"
             >
@@ -336,7 +342,9 @@ export default function MarketingPage() {
                   onDragLeave={onDragLeave}
                   onDrop={onDrop(t.id)}
                   className={`group flex items-center gap-2 px-2 py-2 rounded-lg border transition-all ${
-                    sendoArrastada
+                    destacarId === t.id
+                      ? 'border-emerald-600/60 bg-emerald-900/10'
+                      : sendoArrastada
                       ? 'border-violet-700/60 bg-[#1a1a24]'
                       : 'border-transparent hover:border-[#1e1e2e] hover:bg-[#15151f]'
                   } ${t.feito ? 'opacity-50' : ''}`}
