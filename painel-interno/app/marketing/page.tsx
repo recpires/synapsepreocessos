@@ -151,21 +151,15 @@ export default function MarketingPage() {
   const subir = (idx: number) => moverPara(idx, idx - 1)
   const descer = (idx: number) => moverPara(idx, idx + 1)
 
-  const adicionar = (e?: React.FormEvent | React.MouseEvent) => {
-    e?.preventDefault?.()
-    e?.stopPropagation?.()
+  const adicionar = () => {
+    console.log('[marketing] adicionar() disparou', { novoTexto, novaPrio })
     const texto = novoTexto.trim()
-    console.log('[marketing] adicionar()', { texto, novaPrio })
     if (!texto) {
-      console.warn('[marketing] texto vazio — nada a adicionar')
+      alert('Digite o nome da tarefa antes de adicionar.')
       return
     }
     const id = 't' + Date.now() + '-' + Math.floor(Math.random() * 1000)
-    setTarefas(prev => {
-      const proxima = [{ id, texto, prio: novaPrio }, ...prev]
-      console.log('[marketing] tarefa adicionada', { id, total: proxima.length })
-      return proxima
-    })
+    setTarefas(prev => [{ id, texto, prio: novaPrio }, ...prev])
     setNovoTexto('')
     setNovaPrio('Média')
     setDestacarId(id)
@@ -349,12 +343,13 @@ export default function MarketingPage() {
           </div>
 
           {/* Form de adicionar */}
-          <form onSubmit={adicionar} className="flex flex-col sm:flex-row gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row gap-2 mb-2">
             <input
               type="text"
               value={novoTexto}
               onChange={e => setNovoTexto(e.target.value)}
-              placeholder="Adicionar nova tarefa..."
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); adicionar() } }}
+              placeholder="Digite uma nova tarefa e clique em Adicionar..."
               className="flex-1 bg-[#1a1a24] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-700/60"
             />
             <select
@@ -368,12 +363,18 @@ export default function MarketingPage() {
               <option value="Baixa">Baixa</option>
             </select>
             <button
-              type="submit"
+              type="button"
+              onClick={() => adicionar()}
+              onMouseDown={() => console.log('[marketing] mouseDown no botão Adicionar')}
+              style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
               className="px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
             >
               + Adicionar
             </button>
-          </form>
+          </div>
+          <p className="text-[10px] text-gray-600 mb-3 font-mono">
+            DEBUG · estado atual: novoTexto=&quot;{novoTexto}&quot; · prio={novaPrio} · total={tarefas.length}
+          </p>
 
           {/* Ações de lista */}
           <div className="flex items-center gap-2 mb-3">
