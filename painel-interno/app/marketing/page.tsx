@@ -17,6 +17,28 @@ const CALENDARIO = [
   { dia: 'Ter 26/05', tipo: 'Carrossel', tipoCor: 'bg-violet-900/30 text-violet-400 border border-violet-800/40', titulo: 'Ecossistema — 5 produtos · 1 marca',   desc: 'Recap multi-paleta · 6 slides · 19h30' },
 ]
 
+// ───────────────────────────────────────────────────────────────────────────────
+// Reels — 8 Reels distribuídos nas 4 semanas (sem1 → sem4)
+// Reflete D:\Synapse Code\instagram\reels\calendario-reels.md
+// ───────────────────────────────────────────────────────────────────────────────
+const REELS = [
+  { id: 'R01', sem: 'sem1', data: 'qui 21/05', hora: '19h00', dur: '30s', titulo: 'Tour Synapse Code',        foco: 'Apresentação dos 5 produtos',  audience: 'Geral' },
+  { id: 'R02', sem: 'sem1', data: 'sáb 23/05', hora: '11h00', dur: '25s', titulo: 'POV Barbearia',             foco: 'Nero Barber — narrativa POV',  audience: 'Dono de barbearia' },
+  { id: 'R03', sem: 'sem2', data: 'qua 27/05', hora: '20h00', dur: '60s', titulo: 'Agente IA em 60s',          foco: 'Explainer RAG WhatsApp',       audience: 'Founder técnico' },
+  { id: 'R04', sem: 'sem2', data: 'dom 31/05', hora: '10h00', dur: '20s', titulo: 'Planilha vs CRM',           foco: 'Nexio — comparação rápida',    audience: 'Agência' },
+  { id: 'R05', sem: 'sem3', data: 'qui 04/06', hora: '19h00', dur: '45s', titulo: '5 sinais terceirizada',     foco: 'Mythbusting técnico viral',    audience: 'Founder/CTO' },
+  { id: 'R06', sem: 'sem3', data: 'seg 08/06', hora: '09h00', dur: '30s', titulo: 'Bot vs Agente RAG',         foco: 'Comparação visual conversa',   audience: 'PME atendimento' },
+  { id: 'R07', sem: 'sem4', data: 'qua 10/06', hora: '19h00', dur: '25s', titulo: 'Stack 2026',                foco: 'Logo parade da stack',         audience: 'Dev/founder' },
+  { id: 'R08', sem: 'sem4', data: 'seg 15/06', hora: '20h00', dur: '60s', titulo: 'RAG em 60s',                foco: 'Pipeline RAG animado',         audience: 'Founder técnico' },
+]
+
+const SEM_COR: Record<string, string> = {
+  sem1: 'bg-pink-900/30 text-pink-400 border border-pink-800/40',
+  sem2: 'bg-violet-900/30 text-violet-400 border border-violet-800/40',
+  sem3: 'bg-blue-900/30 text-blue-400 border border-blue-800/40',
+  sem4: 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/40',
+}
+
 const PILARES = [
   { icon: '📚', bg: 'bg-violet-900/15',  titulo: 'Educação (40%)',     desc: 'Como resolver problemas do nicho com tecnologia' },
   { icon: '⭐', bg: 'bg-emerald-900/15', titulo: 'Prova social (30%)', desc: 'Resultados, antes/depois, números reais de clientes' },
@@ -43,36 +65,44 @@ type Tarefa = {
   feito?: boolean
 }
 
-// Seed baseado no calendário Instagram real (sem1 → sem4)
+// Seed baseado no calendário Instagram real (sem1 → sem4) + Reels
 const TAREFAS_INICIAIS: Tarefa[] = [
-  // URGENTE — semana corrente (sem1)
-  { id: 't1',  texto: 'Postar carrossel institucional Synapse Code hoje às 19h00',         prio: 'Urgente' },
-  { id: 't2',  texto: 'Otimizar bio e perfil do Instagram da Synapse Code',                prio: 'Urgente' },
-  { id: 't3',  texto: 'Produzir carrossel Nero Barber (4 slides) — postar 21/05 às 18h30', prio: 'Urgente' },
-  { id: 't4',  texto: 'Produzir post único Nexio CRM — postar 22/05 às 12h00',             prio: 'Urgente' },
+  // URGENTE — semana corrente (sem1): posts + reels R01/R02
+  { id: 't1',  texto: 'Postar carrossel institucional Synapse Code hoje às 19h00',          prio: 'Urgente' },
+  { id: 't2',  texto: 'Otimizar bio e perfil do Instagram da Synapse Code',                 prio: 'Urgente' },
+  { id: 't3',  texto: 'Produzir carrossel Nero Barber (4 slides) — postar 21/05 às 18h30',  prio: 'Urgente' },
+  { id: 't4',  texto: 'Produzir post único Nexio CRM — postar 22/05 às 12h00',              prio: 'Urgente' },
+  { id: 'tR01', texto: 'Reel R01 · Tour Synapse Code (30s) — postar 21/05 às 19h00',         prio: 'Urgente' },
+  { id: 'tR02', texto: 'Reel R02 · POV Barbearia (25s) — postar 23/05 às 11h00',             prio: 'Urgente' },
 
   // ALTA — resto da sem1 + arranque do funil
-  { id: 't5',  texto: 'Produzir carrossel PsiAura (3 slides) — postar 23/05 às 10h00',     prio: 'Alta' },
-  { id: 't6',  texto: 'Produzir post único Kubic Eng — postar 24/05 às 11h00',             prio: 'Alta' },
-  { id: 't7',  texto: 'Produzir carrossel Agentes IA (4 slides) — postar 25/05 às 09h00',  prio: 'Alta' },
-  { id: 't8',  texto: 'Produzir recap Ecossistema Synapse (6 slides) — 26/05 às 19h30',    prio: 'Alta' },
-  { id: 't9',  texto: 'Criar LP dedicada para Nero Barber com CTA de trial 14 dias',        prio: 'Alta' },
+  { id: 't5',  texto: 'Produzir carrossel PsiAura (3 slides) — postar 23/05 às 10h00',      prio: 'Alta' },
+  { id: 't6',  texto: 'Produzir post único Kubic Eng — postar 24/05 às 11h00',              prio: 'Alta' },
+  { id: 't7',  texto: 'Produzir carrossel Agentes IA (4 slides) — postar 25/05 às 09h00',   prio: 'Alta' },
+  { id: 't8',  texto: 'Produzir recap Ecossistema Synapse (6 slides) — 26/05 às 19h30',     prio: 'Alta' },
+  { id: 't9',  texto: 'Criar LP dedicada para Nero Barber com CTA de trial 14 dias',         prio: 'Alta' },
 
-  // MÉDIA — sem2 (thought leadership + cases) e LinkedIn
+  // MÉDIA — sem2 (thought leadership + cases) + reels R03/R04 + LinkedIn
   { id: 't10', texto: 'Produzir conteúdo sem2: thought leadership Synapse + mini-case Nero', prio: 'Média' },
   { id: 't11', texto: 'Produzir sem2: Nexio (planilha vs CRM) + PsiAura (CFP 11/2018)',      prio: 'Média' },
   { id: 't12', texto: 'Produzir sem2: Kubic (Curva-S) + Agentes IA (bot vs RAG) + bastidores', prio: 'Média' },
-  { id: 't13', texto: 'Ativar LinkedIn pessoal do Rodrigo com 3 posts/semana',                 prio: 'Média' },
-  { id: 't14', texto: 'Responder DMs e comentários qualificados dos posts da semana',          prio: 'Média' },
+  { id: 'tR03', texto: 'Reel R03 · Agente IA em 60s — postar 27/05 às 20h00',                prio: 'Média' },
+  { id: 'tR04', texto: 'Reel R04 · Planilha vs CRM (20s) — postar 31/05 às 10h00',           prio: 'Média' },
+  { id: 't13', texto: 'Ativar LinkedIn pessoal do Rodrigo com 3 posts/semana',                prio: 'Média' },
+  { id: 't14', texto: 'Responder DMs e comentários qualificados dos posts da semana',         prio: 'Média' },
 
-  // BAIXA — sem3, sem4 e LPs dos demais produtos
+  // BAIXA — sem3, sem4, reels R05-R08 e LPs dos demais produtos
   { id: 't15', texto: 'Planejar conteúdo sem3: mitos + FAQs (quebra de objeções)',           prio: 'Baixa' },
+  { id: 'tR05', texto: 'Reel R05 · 5 sinais terceirizada (45s) — postar 04/06 às 19h00',     prio: 'Baixa' },
+  { id: 'tR06', texto: 'Reel R06 · Bot vs Agente RAG (30s) — postar 08/06 às 09h00',         prio: 'Baixa' },
   { id: 't16', texto: 'Planejar conteúdo sem4: stack técnica + storytelling + RAG',           prio: 'Baixa' },
+  { id: 'tR07', texto: 'Reel R07 · Stack 2026 (25s) — postar 10/06 às 19h00',                prio: 'Baixa' },
+  { id: 'tR08', texto: 'Reel R08 · RAG em 60s — postar 15/06 às 20h00',                       prio: 'Baixa' },
   { id: 't17', texto: 'Criar LPs para Psi Aura, CRM Nexio e Kubic Eng',                       prio: 'Baixa' },
   { id: 't18', texto: 'Configurar pixel Meta + GA4 nas LPs para medir DM-iniciadas',          prio: 'Baixa' },
 ]
 
-const STORAGE_KEY = 'synapse-marketing-tarefas-v1'
+const STORAGE_KEY = 'synapse-marketing-tarefas-v2'
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Page
@@ -260,6 +290,36 @@ export default function MarketingPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Reels — 4 semanas */}
+        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-fuchsia-500 inline-block" />
+              Calendário de Reels — 4 semanas (8 Reels · vertical 1080×1920)
+            </p>
+            <span className="text-[11px] text-gray-600">CTA: WhatsApp (11) 91527-1542</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {REELS.map(r => (
+              <div key={r.id} className="bg-[#1a1a24] border border-[#1e1e2e] rounded-lg p-3 hover:border-[#2d2d3d] transition-colors">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-gray-500">{r.id}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${SEM_COR[r.sem]}`}>{r.sem}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500">{r.dur}</span>
+                </div>
+                <p className="text-sm text-white font-medium leading-snug mt-1">{r.titulo}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{r.foco}</p>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#1e1e2e]">
+                  <span className="text-[10px] text-gray-500">{r.data} · {r.hora}</span>
+                  <span className="text-[10px] text-gray-600">{r.audience}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
