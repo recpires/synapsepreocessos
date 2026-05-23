@@ -57,6 +57,7 @@ const EMPTY_FORM: ContratoInsert = {
   responsavel: 'Rodrigo',
   observacao: '',
   gerado_por_template: false,
+  lado: 'cliente',
   created_by: 'painel',
 }
 
@@ -310,18 +311,18 @@ function ModalUsarTemplate({ open, template, onClose, onGerar }: {
 function ModalContrato({ open, onClose, onSave }: {
   open: boolean; onClose: () => void; onSave: (c: ContratoInsert, file?: File) => Promise<void>
 }) {
-  const [form, setForm]   = useState<ContratoInsert>({ ...EMPTY_FORM })
+  const [form, setForm]   = useState<ContratoInsert>(EMPTY_FORM)
   const [arquivo, setArq] = useState<File | null>(null)
   const [saving, setSave] = useState(false)
 
-  useEffect(() => { if (open) { setForm({ ...EMPTY_FORM }); setArq(null) } }, [open])
+  useEffect(() => { if (open) { setForm(EMPTY_FORM); setArq(null) } }, [open])
   if (!open) return null
 
   const set = (k: keyof ContratoInsert, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setSave(true)
-    await onSave(form, arquivo ?? undefined)
+    await onSave({ ...form, lado: 'cliente' }, arquivo ?? undefined)
     setSave(false)
   }
 
@@ -467,7 +468,8 @@ function ModalGerador({ open, onClose, onSave }: {
       data_inicio: dados['data_inicio'] ?? new Date().toISOString().split('T')[0],
       responsavel: dados['responsavel'] ?? 'Rodrigo',
       observacao: `Gerado via template: ${template.nome}`,
-      gerado_por_template: true, template_tipo: template.id, created_by: 'painel',
+      gerado_por_template: true, template_tipo: template.id,
+      lado: 'cliente', created_by: 'painel',
     })
     setSaving(false)
   }
@@ -694,7 +696,7 @@ function ListaContratos({ contratos, onDelete, onAdd, onGerar }: {
 
       <div className="flex flex-wrap gap-3 items-center">
         <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar cliente…" className={`${sel} w-48 placeholder-gray-600`} />
+          placeholder="Buscar cliente…" className={`${sel} w-full sm:w-48 placeholder-gray-600`} />
         <select value={tipoFiltro} onChange={e => setTipo(e.target.value)} className={sel}>
           <option value="Todos">Todos os tipos</option>
           {TIPOS_CONTRATO.map(t => <option key={t}>{t}</option>)}
@@ -710,7 +712,7 @@ function ListaContratos({ contratos, onDelete, onAdd, onGerar }: {
           <button onClick={() => { setBusca(''); setTipo('Todos'); setStatus('todos') }}
             className="text-xs text-gray-500 hover:text-white transition-colors">Limpar</button>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="sm:ml-auto flex items-center gap-2 flex-wrap">
           <span className="text-sm text-gray-500">{filtrados.length} contrato{filtrados.length !== 1 ? 's' : ''}</span>
           <button onClick={onGerar}
             className="flex items-center gap-1.5 bg-[#1e1e2e] hover:bg-[#2d2d3d] border border-[#2d2d3d] text-gray-300 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
@@ -802,7 +804,12 @@ export default function ContratosPage() {
 
   const fetchContratos = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('contratos').select('*').order('data_inicio', { ascending: false })
+    // Lado cliente apenas (NULL no banco = legado tratado como cliente)
+    const { data } = await supabase
+      .from('contratos')
+      .select('*')
+      .or('lado.eq.cliente,lado.is.null')
+      .order('data_inicio', { ascending: false })
     setContratos((data as Contrato[]) ?? [])
     setLoading(false)
   }, [supabase])
@@ -821,12 +828,12 @@ export default function ContratosPage() {
         arquivo_url = url.publicUrl; arquivo_nome = file.name
       }
     }
-    await supabase.from('contratos').insert({ ...c, arquivo_url, arquivo_nome })
+    await supabase.from('contratos').insert({ ...c, lado: 'cliente', arquivo_url, arquivo_nome })
     setModalUpload(false); fetchContratos()
   }
 
   async function handleSaveGerado(c: ContratoInsert) {
-    await supabase.from('contratos').insert(c)
+    await supabase.from('contratos').insert({ ...c, lado: 'cliente' })
     setModalGerador(false); fetchContratos()
   }
 
@@ -843,13 +850,13 @@ export default function ContratosPage() {
 
   return (
     <PainelShell>
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-start sm:items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">Contratos</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              {contratos.length} contrato{contratos.length !== 1 ? 's' : ''} cadastrado{contratos.length !== 1 ? 's' : ''}
+              {contratos.length} contrato{contratos.length !== 1 ? 's' : ''} com clientes
             </p>
           </div>
           <div className="flex items-center gap-1 bg-[#111118] border border-[#1e1e2e] rounded-xl p-1">
@@ -869,22 +876,22 @@ export default function ContratosPage() {
 
         {/* KPIs — só na aba contratos */}
         {aba === 'contratos' && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Vigentes</p>
-              <p className="text-2xl font-bold text-emerald-400">{vigentes}</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5">
+              <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Vigentes</p>
+              <p className="text-xl sm:text-2xl font-bold text-emerald-400">{vigentes}</p>
             </div>
-            <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Pend. assinatura</p>
-              <p className="text-2xl font-bold text-orange-400">{pendentes}</p>
+            <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5">
+              <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Pend. assinatura</p>
+              <p className="text-xl sm:text-2xl font-bold text-orange-400">{pendentes}</p>
             </div>
-            <div className={`border rounded-xl p-5 ${vencendo > 0 ? 'bg-amber-900/20 border-amber-700/50' : 'bg-[#111118] border-[#1e1e2e]'}`}>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Vencendo em 30d</p>
-              <p className={`text-2xl font-bold ${vencendo > 0 ? 'text-amber-400' : 'text-white'}`}>{vencendo}</p>
+            <div className={`border rounded-xl p-4 sm:p-5 ${vencendo > 0 ? 'bg-amber-900/20 border-amber-700/50' : 'bg-[#111118] border-[#1e1e2e]'}`}>
+              <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Vencendo em 30d</p>
+              <p className={`text-xl sm:text-2xl font-bold ${vencendo > 0 ? 'text-amber-400' : 'text-white'}`}>{vencendo}</p>
             </div>
-            <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Valor em vigência</p>
-              <p className="text-2xl font-bold text-violet-400">{fmt(valorTotal)}</p>
+            <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5">
+              <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Valor em vigência</p>
+              <p className="text-xl sm:text-2xl font-bold text-violet-400">{fmt(valorTotal)}</p>
             </div>
           </div>
         )}

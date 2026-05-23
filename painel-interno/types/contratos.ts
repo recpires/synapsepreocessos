@@ -1,3 +1,5 @@
+export type LadoContrato = 'cliente' | 'empresa'
+
 export type Contrato = {
   id: string
   cliente: string
@@ -12,6 +14,8 @@ export type Contrato = {
   arquivo_nome?: string
   gerado_por_template?: boolean
   template_tipo?: string
+  /** 'cliente' = contratos com clientes da Synapse · 'empresa' = contratos onde a Synapse é contratante (aluguel, contador, etc.) */
+  lado?: LadoContrato
   created_at: string
   created_by: string
 }
@@ -24,6 +28,22 @@ export const TIPOS_CONTRATO = [
   'NDA',
   'Manutenção',
   'Consultoria',
+  'Outro',
+] as const
+
+/** Categorias usadas quando a Synapse é a contratante (despesas) */
+export const TIPOS_CONTRATO_EMPRESA = [
+  'Aluguel / Imóvel',
+  'Contabilidade',
+  'Hospedagem / Cloud',
+  'Software / Licença',
+  'Fornecedor',
+  'Funcionário / CLT',
+  'PJ / Freelancer',
+  'Telecom / Internet',
+  'Marketing',
+  'Jurídico',
+  'Seguro',
   'Outro',
 ] as const
 
