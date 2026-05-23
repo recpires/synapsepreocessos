@@ -386,27 +386,37 @@ export default function BalancoPage() {
                   <div className="text-center py-10 text-gray-600 text-sm">Sem despesas no período</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm top10-table">
+                      <colgroup className="hidden print:table-column-group">
+                        <col style={{ width: '4%'  }} />
+                        <col style={{ width: '10%' }} />
+                        <col style={{ width: '38%' }} />
+                        <col style={{ width: '18%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '16%' }} />
+                      </colgroup>
                       <thead>
                         <tr className="border-b border-[#1e1e2e] print:border-gray-400">
-                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[4%]">#</th>
-                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[11%]">Data</th>
-                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[34%]">Descrição</th>
-                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[16%]">Categoria</th>
-                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[14%]">Produto</th>
-                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[9%]">Tipo</th>
-                          <th className="text-right text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[12%]">Valor</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800">#</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800">Data</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800">Descrição</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800">Categoria</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:hidden">Produto</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:hidden">Tipo</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 hidden print:table-cell">Produto</th>
+                          <th className="text-right text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800">Valor</th>
                         </tr>
                       </thead>
                       <tbody>
                         {top10.map((d, i) => (
                           <tr key={d.id} className="border-b border-[#1e1e2e]/60 print:border-gray-200">
                             <td className="px-4 py-2.5 text-gray-500 print:text-gray-700">{i + 1}</td>
-                            <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700">{fmtDataPT(d.data)}</td>
-                            <td className="px-4 py-2.5 text-white max-w-[260px] truncate print:text-black">{d.descricao}</td>
-                            <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700">{d.categoria}</td>
-                            <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700">{d.produto}</td>
-                            <td className="px-4 py-2.5 text-gray-500 capitalize whitespace-nowrap print:text-gray-700">{d.tipo}</td>
+                            <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700 print:whitespace-normal">{fmtDataPT(d.data)}</td>
+                            <td className="px-4 py-2.5 text-white max-w-[260px] truncate print:text-black print:max-w-none print:whitespace-normal print:overflow-visible">{d.descricao}</td>
+                            <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700 print:whitespace-normal">{d.categoria}</td>
+                            <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700 print:hidden">{d.produto}</td>
+                            <td className="px-4 py-2.5 text-gray-500 capitalize whitespace-nowrap print:text-gray-700 print:hidden">{d.tipo}</td>
+                            <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700 print:whitespace-normal hidden print:table-cell">{d.produto}</td>
                             <td className="px-4 py-2.5 text-right text-red-400 font-semibold whitespace-nowrap print:text-red-700">{fmt(Number(d.valor))}</td>
                           </tr>
                         ))}
@@ -441,7 +451,13 @@ export default function BalancoPage() {
         @media print {
           @page {
             size: A4 portrait;
-            margin: 1.6cm 1.4cm 1.6cm 1.4cm;
+            margin: 1.8cm 1.5cm 1.8cm 1.5cm;
+          }
+
+          /* Reset agressivo para nada estourar a margem */
+          * {
+            box-sizing: border-box !important;
+            max-width: 100% !important;
           }
 
           html, body {
@@ -449,9 +465,12 @@ export default function BalancoPage() {
             color: #111 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif !important;
-            font-size: 9.5pt !important;
-            line-height: 1.45 !important;
+            font-family: 'Helvetica Neue', Helvetica, Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+            font-size: 9pt !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
           /* Esconder shell, sidebar, topbar mobile, controles interativos */
@@ -461,124 +480,158 @@ export default function BalancoPage() {
             display: none !important;
           }
 
-          /* Anular layout flex do PainelShell para o conteúdo ocupar 100% */
+          /* Anular layout flex do PainelShell e overflow horizontal */
           body > div,
           body > div > div,
           .flex {
             display: block !important;
             background: #ffffff !important;
+            width: 100% !important;
+            overflow: visible !important;
           }
           .min-h-screen { min-height: auto !important; }
 
-          /* Container principal */
+          /* Container principal — usa toda a área disponível */
           .max-w-7xl {
             max-width: 100% !important;
+            width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
           }
-          main { overflow: visible !important; }
+          main {
+            overflow: visible !important;
+            width: 100% !important;
+          }
+
+          /* Override universal: nada whitespace-nowrap no print (quebra elegante) */
+          .whitespace-nowrap { white-space: normal !important; }
+          .truncate {
+            text-overflow: clip !important;
+            overflow: visible !important;
+            white-space: normal !important;
+          }
 
           /* Cabeçalho executivo */
           .print-header {
-            margin: 0 0 18pt 0 !important;
-            padding-bottom: 14pt;
-            border-bottom: 1.5pt solid #111;
+            margin: 0 0 20pt 0 !important;
+            padding-bottom: 12pt;
+            border-bottom: 2pt solid #111;
+            width: 100% !important;
           }
           .print-header-top {
-            display: flex !important;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 20pt;
+            display: table !important;
+            width: 100% !important;
+            table-layout: fixed;
+          }
+          .print-header-top > div {
+            display: table-cell !important;
+            vertical-align: top;
+          }
+          .print-header-top > div:last-child {
+            text-align: right;
+            width: 35% !important;
           }
           .print-eyebrow {
-            font-size: 8pt;
-            letter-spacing: 3pt;
+            font-size: 7.5pt;
+            letter-spacing: 2.5pt;
             color: #7c3aed !important;
             font-weight: 700;
             margin: 0 0 6pt 0;
+            text-transform: uppercase;
           }
           .print-title {
-            font-size: 22pt;
+            font-size: 24pt;
             font-weight: 700;
-            color: #111 !important;
-            letter-spacing: -0.4pt;
-            margin: 0 0 4pt 0;
-            line-height: 1.1;
+            color: #0a0a0f !important;
+            letter-spacing: -0.6pt;
+            margin: 0 0 6pt 0;
+            line-height: 1.05;
           }
           .print-subtitle {
-            font-size: 10pt;
-            color: #555 !important;
+            font-size: 10.5pt;
+            color: #4a4a55 !important;
             margin: 0;
+            font-weight: 400;
           }
           .print-header-meta {
             text-align: right;
-            font-size: 9pt;
-            color: #444 !important;
-            min-width: 140pt;
+            font-size: 8.5pt;
+            color: #4a4a55 !important;
           }
           .print-header-meta p { margin: 0 0 2pt 0; }
+          .print-header-meta strong { color: #0a0a0f !important; }
           .print-meta-small {
-            font-size: 7.5pt;
+            font-size: 7pt !important;
             color: #888 !important;
-            letter-spacing: 0.5pt;
+            letter-spacing: 1pt;
             text-transform: uppercase;
-            margin-top: 6pt !important;
+            margin-top: 8pt !important;
+            font-weight: 600;
           }
           .print-divider {
             display: none;
           }
 
           /* Títulos de seção */
+          section { margin-bottom: 14pt !important; width: 100% !important; }
+          .space-y-6 > section { margin-bottom: 16pt !important; }
           h2 {
-            font-size: 12pt !important;
+            font-size: 11pt !important;
             font-weight: 700 !important;
-            color: #111 !important;
-            margin: 18pt 0 8pt 0 !important;
-            padding-bottom: 4pt;
-            border-bottom: 0.5pt solid #ccc;
-            letter-spacing: 0.2pt;
+            color: #0a0a0f !important;
+            margin: 14pt 0 8pt 0 !important;
+            padding-bottom: 5pt;
+            border-bottom: 0.6pt solid #999;
+            letter-spacing: 0.3pt;
+            text-transform: uppercase;
           }
           h3 {
-            font-size: 10pt !important;
-            font-weight: 600 !important;
-            color: #222 !important;
+            font-size: 9.5pt !important;
+            font-weight: 700 !important;
+            color: #0a0a0f !important;
             margin: 0 0 8pt 0 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.5pt;
           }
 
-          /* Cards / boxes */
+          /* Cards / boxes — bordas suaves, sem fundo cinza pra economizar tinta */
           .bg-\\[\\#111118\\],
           .bg-\\[\\#0a0a0f\\],
           .bg-\\[\\#0f0f17\\] {
-            background: #fafafa !important;
+            background: #ffffff !important;
           }
           .border-\\[\\#1e1e2e\\],
           .border-\\[\\#2d2d3d\\] {
-            border-color: #d0d0d0 !important;
+            border-color: #d4d4d8 !important;
           }
-          .rounded-xl { border-radius: 6pt !important; }
+          .rounded-xl { border-radius: 4pt !important; }
 
-          /* Grid de KPIs mais compacto */
+          /* Grids */
           .grid {
             display: grid !important;
-            gap: 8pt !important;
+            gap: 6pt !important;
+            width: 100% !important;
           }
           .grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
           .lg\\:grid-cols-4 { grid-template-columns: repeat(4, 1fr) !important; }
           .sm\\:grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
           .lg\\:grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
 
-          /* KPI cards */
+          /* KPI cards — compactos */
           .p-4, .p-5, .sm\\:p-5 {
-            padding: 10pt !important;
+            padding: 8pt 10pt !important;
           }
           .text-xl, .sm\\:text-2xl, .text-2xl {
-            font-size: 14pt !important;
+            font-size: 13pt !important;
+            letter-spacing: -0.3pt;
           }
           .text-\\[10px\\], .text-xs, .sm\\:text-xs {
-            font-size: 7.5pt !important;
+            font-size: 7pt !important;
           }
+          .text-sm { font-size: 8.5pt !important; }
+          .text-lg { font-size: 11pt !important; }
 
-          /* Tabelas */
+          /* Tabelas — espaçamento e tipografia profissional */
           table {
             width: 100% !important;
             border-collapse: collapse !important;
@@ -586,47 +639,58 @@ export default function BalancoPage() {
             table-layout: fixed !important;
           }
           table th {
-            font-weight: 600 !important;
-            font-size: 7.5pt !important;
+            font-weight: 700 !important;
+            font-size: 7pt !important;
             text-transform: uppercase;
-            letter-spacing: 0.4pt;
-            color: #555 !important;
-            padding: 5pt 6pt !important;
-            border-bottom: 1pt solid #999 !important;
-            background: #f5f5f7 !important;
+            letter-spacing: 0.6pt;
+            color: #444 !important;
+            padding: 6pt 5pt !important;
+            border-bottom: 1pt solid #333 !important;
+            background: transparent !important;
+            text-align: left;
           }
+          table th.text-right { text-align: right !important; }
           table td {
-            padding: 4pt 6pt !important;
-            border-bottom: 0.4pt solid #e0e0e0 !important;
+            padding: 5pt !important;
+            border-bottom: 0.4pt solid #e5e5e7 !important;
             vertical-align: top;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.4;
           }
-          table tbody tr:last-child td { border-bottom: 0.4pt solid #999 !important; }
+          table tbody tr:last-child td { border-bottom: 0.6pt solid #333 !important; }
+
+          /* Tabela Top 10 — compactar ainda mais */
+          .top10-table { font-size: 8pt !important; }
+          .top10-table td { padding: 4pt 5pt !important; }
 
           /* Remover overflow horizontal */
           .overflow-x-auto, .overflow-hidden, .overflow-y-auto {
             overflow: visible !important;
+            width: 100% !important;
           }
 
           /* Inputs (receita por produto) — exibir valor em vez do campo */
           input { display: none !important; }
 
-          /* Page breaks */
+          /* Page breaks — proteger blocos coesos */
           .print\\:break-inside-avoid,
-          section,
-          table {
+          section {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
-          h2 { break-after: avoid; page-break-after: avoid; }
+          table, thead, tbody, tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+          h2, h3 { break-after: avoid; page-break-after: avoid; }
 
-          /* Recharts — limitar altura para caber */
-          .recharts-wrapper { max-width: 100% !important; }
+          /* Recharts */
+          .recharts-wrapper, .recharts-surface {
+            max-width: 100% !important;
+            width: 100% !important;
+          }
 
           /* Cores explícitas (escape para forçar) */
-          .print\\:text-black { color: #111 !important; }
-          .print\\:text-gray-700 { color: #555 !important; }
+          .print\\:text-black { color: #0a0a0f !important; }
+          .print\\:text-gray-700 { color: #525252 !important; }
           .print\\:text-gray-800 { color: #333 !important; }
           .print\\:text-emerald-700 { color: #047857 !important; }
           .print\\:text-red-700 { color: #b91c1c !important; }
@@ -635,24 +699,59 @@ export default function BalancoPage() {
           .print\\:text-yellow-700 { color: #a16207 !important; }
           .print\\:bg-white { background: #ffffff !important; }
           .print\\:bg-gray-50 { background: #fafafa !important; }
-          .print\\:bg-gray-100 { background: #f3f3f3 !important; }
-          .print\\:border-gray-200 { border-color: #e5e5e5 !important; }
-          .print\\:border-gray-300 { border-color: #d0d0d0 !important; }
-          .print\\:border-gray-400 { border-color: #999 !important; }
+          .print\\:bg-gray-100 { background: #f3f3f5 !important; }
+          .print\\:border-gray-200 { border-color: #e5e5e7 !important; }
+          .print\\:border-gray-300 { border-color: #d4d4d8 !important; }
+          .print\\:border-gray-400 { border-color: #888 !important; }
 
           /* Linha de totais na tabela de receitas */
           .bg-\\[\\#0a0a0f\\].font-bold,
           tr.bg-\\[\\#0a0a0f\\] {
-            background: #f0f0f3 !important;
+            background: #f4f4f5 !important;
           }
           tr.bg-\\[\\#0a0a0f\\] td {
-            border-top: 1pt solid #888 !important;
+            border-top: 1pt solid #333 !important;
+            border-bottom: 1pt solid #333 !important;
             font-weight: 700 !important;
+            padding-top: 6pt !important;
+            padding-bottom: 6pt !important;
           }
 
-          /* Síntese final mais discreta */
+          /* Síntese final */
+          ul {
+            list-style: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
           ul li {
-            margin-bottom: 3pt;
+            margin-bottom: 5pt;
+            font-size: 9pt;
+            line-height: 1.5;
+            padding-left: 10pt;
+            position: relative;
+          }
+          ul li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: #7c3aed;
+            font-weight: 700;
+          }
+
+          /* Rodapé com número de página em cada folha */
+          @page {
+            @bottom-right {
+              content: counter(page) ' / ' counter(pages);
+              font-size: 8pt;
+              color: #888;
+              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            }
+            @bottom-left {
+              content: 'Synapse Code · Balanço Semestral';
+              font-size: 8pt;
+              color: #888;
+              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            }
           }
         }
       `}</style>

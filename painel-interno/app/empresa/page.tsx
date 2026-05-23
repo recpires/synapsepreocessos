@@ -174,6 +174,16 @@ export default function EmpresaPage() {
   const [busca, setBusca]           = useState('')
   const [tipoFiltro, setTipo]       = useState('Todos')
   const [statusFiltro, setStatus]   = useState('todos')
+  const [view, setView]             = useState<'lista' | 'miniatura'>('lista')
+
+  // Persistir preferencia de visualização
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('empresa-view') : null
+    if (saved === 'lista' || saved === 'miniatura') setView(saved)
+  }, [])
+  useEffect(() => {
+    try { localStorage.setItem('empresa-view', view) } catch {}
+  }, [view])
 
   const fetchDocumentos = useCallback(async () => {
     setLoading(true)
@@ -323,6 +333,39 @@ export default function EmpresaPage() {
           )}
           <div className="sm:ml-auto flex items-center gap-2 flex-wrap">
             <span className="text-sm text-gray-500">{filtrados.length} doc{filtrados.length !== 1 ? 's' : ''}</span>
+
+            {/* Toggle de visualização */}
+            <div className="flex items-center bg-[#111118] border border-[#2d2d3d] rounded-lg p-0.5">
+              <button
+                onClick={() => setView('lista')}
+                title="Visualização em lista"
+                aria-label="Visualização em lista"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  view === 'lista' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="8" y1="6"  x2="21" y2="6"  /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6"  x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+                Lista
+              </button>
+              <button
+                onClick={() => setView('miniatura')}
+                title="Visualização em miniaturas"
+                aria-label="Visualização em miniaturas"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  view === 'miniatura' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                </svg>
+                Miniatura
+              </button>
+            </div>
+
             <button onClick={() => setModal(true)}
               className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
               + Cadastrar
@@ -330,16 +373,18 @@ export default function EmpresaPage() {
           </div>
         </div>
 
-        {/* Lista */}
-        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-20 text-gray-600">Carregando…</div>
-          ) : filtrados.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-600 gap-3">
-              <span className="text-4xl">🏢</span>
-              <p>Nenhum documento da empresa cadastrado.</p>
-            </div>
-          ) : (
+        {/* Conteúdo: lista ou miniatura */}
+        {loading ? (
+          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl flex items-center justify-center py-20 text-gray-600">
+            Carregando…
+          </div>
+        ) : filtrados.length === 0 ? (
+          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl flex flex-col items-center justify-center py-20 text-gray-600 gap-3">
+            <span className="text-4xl">🏢</span>
+            <p>Nenhum documento da empresa cadastrado.</p>
+          </div>
+        ) : view === 'lista' ? (
+          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -388,8 +433,124 @@ export default function EmpresaPage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          /* MINIATURA — grid de cards */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            {filtrados.map(c => {
+              const dias = diasParaVencer(c.data_vencimento)
+              const venceEmBreve = dias !== null && dias >= 0 && dias <= 30 && c.status === 'vigente'
+              const temPdf = !!c.arquivo_url
+
+              return (
+                <div
+                  key={c.id}
+                  className={`group bg-[#111118] border rounded-xl overflow-hidden flex flex-col transition-all hover:border-violet-600/40 hover:shadow-lg hover:shadow-violet-600/5 ${
+                    venceEmBreve ? 'border-amber-700/50' : 'border-[#1e1e2e]'
+                  }`}
+                >
+                  {/* Preview do PDF — área visual */}
+                  <a
+                    href={c.arquivo_url ?? '#'}
+                    target={temPdf ? '_blank' : undefined}
+                    rel={temPdf ? 'noopener noreferrer' : undefined}
+                    onClick={e => { if (!temPdf) e.preventDefault() }}
+                    aria-disabled={!temPdf}
+                    className={`relative aspect-[4/3] flex items-center justify-center border-b border-[#1e1e2e] overflow-hidden ${
+                      temPdf
+                        ? 'bg-gradient-to-br from-[#1a1530] to-[#0a0a0f] cursor-pointer'
+                        : 'bg-[#0a0a0f] cursor-default'
+                    }`}
+                  >
+                    {temPdf ? (
+                      <>
+                        {/* Ícone PDF estilizado */}
+                        <div className="flex flex-col items-center gap-2 transition-transform group-hover:scale-105">
+                          <div className="relative">
+                            <svg width="56" height="64" viewBox="0 0 56 64" fill="none">
+                              <path d="M4 4h32l16 16v36a4 4 0 01-4 4H4a4 4 0 01-4-4V8a4 4 0 014-4z" fill="#1e1b3a" stroke="#7c3aed" strokeWidth="1.5"/>
+                              <path d="M36 4v12a4 4 0 004 4h12" stroke="#7c3aed" strokeWidth="1.5" fill="none"/>
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-violet-300 tracking-wider mt-2">PDF</span>
+                          </div>
+                          <span className="text-[10px] text-gray-500 group-hover:text-violet-400 transition-colors">Abrir documento</span>
+                        </div>
+
+                        {/* Badge categoria no canto */}
+                        <span className="absolute top-2.5 left-2.5 text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#0a0a0f]/80 text-gray-300 border border-[#2d2d3d] backdrop-blur-sm">
+                          {c.tipo}
+                        </span>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-gray-700">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <span className="text-[10px] uppercase tracking-wider">Sem anexo</span>
+                        <span className="absolute top-2.5 left-2.5 text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#0a0a0f]/80 text-gray-400 border border-[#2d2d3d]">
+                          {c.tipo}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Botão excluir — flutua no canto */}
+                    <button
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); handleDelete(c.id) }}
+                      title="Excluir"
+                      aria-label="Excluir"
+                      className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-md bg-[#0a0a0f]/80 border border-[#2d2d3d] text-gray-500 hover:text-red-400 hover:border-red-700/50 transition-colors text-base leading-none opacity-0 group-hover:opacity-100 backdrop-blur-sm"
+                    >
+                      ×
+                    </button>
+                  </a>
+
+                  {/* Conteúdo */}
+                  <div className="p-4 flex flex-col gap-2.5 flex-1">
+                    <div className="flex items-start justify-between gap-2 min-w-0">
+                      <h3 className="text-sm font-semibold text-white truncate" title={c.cliente}>{c.cliente}</h3>
+                      <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap ${STATUS_CORES[c.status] ?? 'bg-gray-800 text-gray-400'}`}>
+                        {STATUS_LABEL[c.status] ?? c.status}
+                      </span>
+                    </div>
+
+                    {/* Valor */}
+                    {c.valor != null && c.valor > 0 ? (
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-base font-bold text-violet-400">{fmt(c.valor)}</span>
+                        <span className="text-[10px] text-gray-600 uppercase tracking-wider">/mês</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-600 italic">Sem valor informado</div>
+                    )}
+
+                    {/* Metadados */}
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] mt-auto pt-2 border-t border-[#1e1e2e]">
+                      <div>
+                        <p className="text-gray-600 uppercase tracking-wider text-[9px]">Início</p>
+                        <p className="text-gray-400">{fmtData(c.data_inicio)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 uppercase tracking-wider text-[9px]">Vencimento</p>
+                        <p className={venceEmBreve ? 'text-amber-400 font-medium' : 'text-gray-400'}>
+                          {c.data_vencimento ? fmtData(c.data_vencimento) : '—'}
+                          {venceEmBreve && <span className="ml-1 text-[10px]">({dias}d)</span>}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-gray-600 pt-1">
+                      <span>👤 {c.responsavel}</span>
+                      {c.arquivo_nome && (
+                        <span className="truncate max-w-[60%]" title={c.arquivo_nome}>{c.arquivo_nome}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <ModalDocumento open={modal} onClose={() => setModal(false)} onSave={handleSave} />
