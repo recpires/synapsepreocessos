@@ -14,6 +14,7 @@ const NAV = [
   { href: '/pipeline',   icon: '📈', label: 'Pipeline' },
   { href: '/marketing',  icon: '📣', label: 'Marketing' },
   { href: '/financeiro', icon: '💰', label: 'Financeiro' },
+  { href: '/receitas',   icon: '💵', label: 'Receitas' },
   { href: '/balanco',    icon: '📑', label: 'Balanço' },
   { href: '/time',       icon: '👥', label: 'Time' },
   { href: '/processos',  icon: '📋', label: 'Processos' },

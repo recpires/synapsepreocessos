@@ -7,7 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import { type Despesa, CATEGORIAS, PRODUTOS_LISTA } from '@/types/financeiro'
+import { type Despesa, type Receita, CATEGORIAS, PRODUTOS_LISTA } from '@/types/financeiro'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -65,41 +65,33 @@ export default function BalancoPage() {
   const [ano, setAno]             = useState<number>(anoAtual)
   const [semestre, setSemestre]   = useState<Semestre>(semestreAtual)
   const [despesas, setDespesas]   = useState<Despesa[]>([])
+  const [receitasDb, setReceitas] = useState<Receita[]>([])
   const [loading, setLoading]     = useState(true)
-  const [receitas, setReceitas]   = useState<Record<string, number>>({})
 
-  // Buscar despesas do semestre
-  const fetchDespesas = useCallback(async () => {
+  // Buscar despesas + receitas do semestre
+  const fetchDados = useCallback(async () => {
     setLoading(true)
     const { inicio, fim } = rangeSemestre(ano, semestre)
-    const { data } = await supabase
-      .from('despesas')
-      .select('*')
-      .gte('data', inicio)
-      .lte('data', fim)
-      .order('data', { ascending: true })
-    setDespesas((data as Despesa[]) ?? [])
+    const [{ data: desp }, { data: rec }] = await Promise.all([
+      supabase.from('despesas').select('*').gte('data', inicio).lte('data', fim).order('data', { ascending: true }),
+      supabase.from('receitas').select('*').gte('data', inicio).lte('data', fim).in('status', ['recebido','confirmado']).order('data', { ascending: true }),
+    ])
+    setDespesas((desp as Despesa[]) ?? [])
+    setReceitas((rec as Receita[]) ?? [])
     setLoading(false)
   }, [supabase, ano, semestre])
 
-  useEffect(() => { fetchDespesas() }, [fetchDespesas])
+  useEffect(() => { fetchDados() }, [fetchDados])
 
-  // Carregar receitas do localStorage
-  const storageKey = `balanco-receitas-${ano}-${semestre}`
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey)
-      setReceitas(stored ? JSON.parse(stored) : {})
-    } catch {
-      setReceitas({})
+  // Receitas por produto (agregadas do banco)
+  const receitasPorProduto = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const r of receitasDb) {
+      const p = r.produto || 'Geral'
+      map[p] = (map[p] ?? 0) + Number(r.valor)
     }
-  }, [storageKey])
-
-  function atualizarReceita(produto: string, valor: number) {
-    const nova = { ...receitas, [produto]: valor }
-    setReceitas(nova)
-    try { localStorage.setItem(storageKey, JSON.stringify(nova)) } catch {}
-  }
+    return map
+  }, [receitasDb])
 
   // Anos disponíveis (do atual a 3 anos atrás)
   const anosDisponiveis = useMemo(
@@ -109,7 +101,7 @@ export default function BalancoPage() {
 
   // Cálculos
   const totalDespesas = despesas.reduce((s, d) => s + Number(d.valor), 0)
-  const totalReceitas = Object.values(receitas).reduce((s, v) => s + (Number(v) || 0), 0)
+  const totalReceitas = receitasDb.reduce((s, r) => s + Number(r.valor), 0)
   const lucroLiquido  = totalReceitas - totalDespesas
   const margem        = totalReceitas > 0 ? (lucroLiquido / totalReceitas) * 100 : 0
 
@@ -135,7 +127,7 @@ export default function BalancoPage() {
     const desp = despesas
       .filter(d => d.produto === prod)
       .reduce((s, d) => s + Number(d.valor), 0)
-    const rec = Number(receitas[prod]) || 0
+    const rec = Number(receitasPorProduto[prod]) || 0
     return {
       produto: prod,
       receita: rec,
@@ -254,20 +246,20 @@ export default function BalancoPage() {
               </div>
             </section>
 
-            {/* Receitas — input manual */}
+            {/* Receitas por produto — agregado do banco */}
             <section className="space-y-3 print:break-inside-avoid">
               <div className="flex items-baseline justify-between flex-wrap gap-2">
                 <h2 className="text-lg font-semibold text-white print:text-black print:text-xl">Receitas por Produto</h2>
-                <p className="text-xs text-gray-500 print:hidden">
-                  Receitas ainda não estão no banco — informe abaixo para incluir no balanço (salvo localmente).
-                </p>
+                <a href="/receitas" className="text-xs text-violet-400 hover:text-violet-300 transition-colors print:hidden">
+                  Gerenciar receitas →
+                </a>
               </div>
               <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden print:bg-white print:border-gray-300">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[#1e1e2e] print:border-gray-300">
-                        {['Produto', 'Receita (R$)', 'Despesas', 'Lucro', 'Margem'].map(h => (
+                        {['Produto', 'Receita', 'Despesas', 'Lucro', 'Margem'].map(h => (
                           <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-700">{h}</th>
                         ))}
                       </tr>
@@ -278,18 +270,7 @@ export default function BalancoPage() {
                         return (
                           <tr key={prod} className="border-b border-[#1e1e2e]/60 print:border-gray-200">
                             <td className="px-4 py-2.5 text-white font-medium print:text-black">{prod}</td>
-                            <td className="px-4 py-2.5">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={receitas[prod] ?? ''}
-                                onChange={e => atualizarReceita(prod, parseFloat(e.target.value) || 0)}
-                                placeholder="0,00"
-                                className="w-32 bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg px-2.5 py-1.5 text-white text-sm focus:outline-none focus:border-violet-600 transition-colors print:hidden"
-                              />
-                              <span className="hidden print:inline text-black">{fmt(p.receita)}</span>
-                            </td>
+                            <td className="px-4 py-2.5 text-emerald-400 print:text-emerald-700">{fmt(p.receita)}</td>
                             <td className="px-4 py-2.5 text-gray-400 print:text-gray-700">{fmt(p.despesas)}</td>
                             <td className={`px-4 py-2.5 font-medium ${p.lucro >= 0 ? 'text-emerald-400 print:text-emerald-700' : 'text-red-400 print:text-red-700'}`}>
                               {fmt(p.lucro)}

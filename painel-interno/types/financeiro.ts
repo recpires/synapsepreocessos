@@ -23,15 +23,33 @@ export type DespesaInsert = Omit<Despesa, 'id' | 'created_at'>
 export type Receita = {
   id: string
   data: string
-  descricao: string
+  descricao?: string
   produto: string
   cliente?: string
+  cliente_id?: string
   valor: number
-  tipo: 'recorrente' | 'pontual'
+  tipo: 'recorrente' | 'pontual' | 'setup'
+  forma_pagamento?: string
+  status: 'recebido' | 'confirmado' | 'estornado' | 'cancelado'
+  origem: 'manual' | 'asaas' | string
+  origem_id?: string
   observacao?: string
+  payload_raw?: unknown
   created_at: string
-  created_by: string
+  updated_at?: string
+  created_by?: string
 }
+
+export type ReceitaInsert = Omit<Receita, 'id' | 'created_at' | 'updated_at'>
+
+export const FORMAS_RECEBIMENTO = [
+  'PIX',
+  'Cartão',
+  'Boleto',
+  'Transferência',
+  'Dinheiro',
+  'Outro',
+] as const
 
 export const CATEGORIAS = [
   'Infraestrutura',
