@@ -7,6 +7,8 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, Legend,
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 import {
   type Despesa,
   type DespesaInsert,
@@ -665,6 +667,8 @@ export default function FinanceiroPage() {
   return (
     <PainelShell>
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        <SubNav tabs={SUBNAV.financeiro} />
+
         {/* Título + controles */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>

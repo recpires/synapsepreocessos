@@ -1,6 +1,8 @@
 'use client'
 
 import PainelShell from '@/components/PainelShell'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 
 const FUNIL = [
   { n: 1, label: 'Lead gerado',             desc: 'Responder em até 2h · Registrar no CRM' },
@@ -49,6 +51,8 @@ export default function ComercialPage() {
   return (
     <PainelShell>
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        <SubNav tabs={SUBNAV.comercial} />
+
         <div>
           <h1 className="text-2xl font-bold text-white">Comercial</h1>
           <p className="text-gray-500 text-sm mt-0.5">Processo de vendas · ICP por produto · Scripts de prospecção</p>

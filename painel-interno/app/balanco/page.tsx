@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -157,6 +159,8 @@ export default function BalancoPage() {
   return (
     <PainelShell>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 print:px-0 print:py-0">
+        <SubNav tabs={SUBNAV.financeiro} />
+
         {/* Cabeçalho + controles */}
         <div className="flex items-start sm:items-center justify-between flex-wrap gap-4 print:hidden">
           <div>

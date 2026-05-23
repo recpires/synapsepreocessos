@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 import {
   type Contrato,
   type ContratoInsert,
@@ -268,6 +270,8 @@ export default function EmpresaPage() {
   return (
     <PainelShell>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        <SubNav tabs={SUBNAV.empresa} />
+
         {/* Cabeçalho */}
         <div>
           <h1 className="text-2xl font-bold text-white">Documentos da Empresa</h1>

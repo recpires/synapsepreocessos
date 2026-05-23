@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 import {
   type Receita,
   type ReceitaInsert,
@@ -229,6 +231,8 @@ export default function ReceitasPage() {
   return (
     <PainelShell>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        <SubNav tabs={SUBNAV.financeiro} />
+
         {/* Cabeçalho */}
         <div className="flex items-start sm:items-center justify-between flex-wrap gap-4">
           <div>

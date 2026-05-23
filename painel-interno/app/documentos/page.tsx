@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 
 type Documento = {
   id: string
@@ -155,6 +157,7 @@ export default function DocumentosPage() {
   return (
     <PainelShell>
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        <SubNav tabs={SUBNAV.empresa} />
 
         {/* Header */}
         <div className="flex items-start justify-between">

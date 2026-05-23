@@ -7,10 +7,19 @@ import Sidebar from './Sidebar'
 
 export default function PainelShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
 
   // Fecha o drawer ao navegar de página
   useEffect(() => { setOpen(false) }, [pathname])
+
+  // Carrega preferencia colapsado do localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-collapsed')
+      if (saved === '1') setCollapsed(true)
+    } catch {}
+  }, [])
 
   // Trava o scroll do body quando o drawer está aberto
   useEffect(() => {
@@ -21,10 +30,23 @@ export default function PainelShell({ children }: { children: React.ReactNode })
     }
   }, [open])
 
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem('sidebar-collapsed', next ? '1' : '0') } catch {}
+      return next
+    })
+  }
+
   return (
     <div className="flex min-h-screen bg-[#0a0a0f]">
       {/* Sidebar — drawer no mobile, sticky no desktop */}
-      <Sidebar open={open} onClose={() => setOpen(false)} />
+      <Sidebar
+        open={open}
+        onClose={() => setOpen(false)}
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
+      />
 
       {/* Overlay escurecido (mobile apenas) */}
       {open && (

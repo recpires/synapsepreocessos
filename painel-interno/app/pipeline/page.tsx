@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 type Lead = {
@@ -237,6 +239,9 @@ export default function PipelinePage() {
 
         {/* Header */}
         <div className="px-6 py-5 border-b border-[#1e1e2e] flex-shrink-0">
+          <div className="mb-4">
+            <SubNav tabs={SUBNAV.comercial} />
+          </div>
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white">Pipeline Comercial</h1>

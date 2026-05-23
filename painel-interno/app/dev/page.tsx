@@ -1,6 +1,8 @@
 'use client'
 
 import PainelShell from '@/components/PainelShell'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 
 const SPRINT_ITEMS = [
   { title: 'Revisar onboarding do cliente (primeiro acesso)',   tag: 'M', tagCor: 'bg-amber-900/30 text-amber-400 border border-amber-800/40',  status: 'Em andamento' },
@@ -29,6 +31,8 @@ export default function DevPage() {
   return (
     <PainelShell>
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        <SubNav tabs={SUBNAV.dev} />
+
         <div>
           <h1 className="text-2xl font-bold text-white">Desenvolvimento</h1>
           <p className="text-gray-500 text-sm mt-0.5">Sprint de 2 semanas · Foco rotativo por produto · Regra 60/20/20</p>

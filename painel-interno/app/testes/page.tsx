@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import SubNav from '@/components/SubNav'
+import { SUBNAV } from '@/lib/nav'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Resultado = 'pendente' | 'passou' | 'falhou' | 'estranho'
@@ -889,6 +891,7 @@ export default function TestesPage() {
   return (
     <PainelShell>
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+        <SubNav tabs={SUBNAV.dev} />
 
         {/* Header */}
         <div>
