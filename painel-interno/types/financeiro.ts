@@ -23,7 +23,7 @@ export type DespesaInsert = Omit<Despesa, 'id' | 'created_at'>
 export type Receita = {
   id: string
   data: string
-  descricao?: string
+  descricao: string
   produto: string
   cliente?: string
   cliente_id?: string
@@ -50,6 +50,24 @@ export const FORMAS_RECEBIMENTO = [
   'Dinheiro',
   'Outro',
 ] as const
+
+export const TIPOS_RECEITA = ['recorrente', 'pontual', 'setup'] as const
+
+export const STATUS_RECEITA = ['recebido', 'confirmado', 'estornado', 'cancelado'] as const
+
+export const STATUS_RECEITA_CORES: Record<string, string> = {
+  recebido:   'bg-emerald-900/40 text-emerald-300 border border-emerald-800',
+  confirmado: 'bg-blue-900/40    text-blue-300    border border-blue-800',
+  estornado:  'bg-red-900/40     text-red-300     border border-red-800',
+  cancelado:  'bg-gray-800       text-gray-400    border border-gray-700',
+}
+
+export const STATUS_RECEITA_LABEL: Record<string, string> = {
+  recebido:   'Recebido',
+  confirmado: 'Confirmado',
+  estornado:  'Estornado',
+  cancelado:  'Cancelado',
+}
 
 export const CATEGORIAS = [
   'Infraestrutura',

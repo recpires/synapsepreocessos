@@ -72,15 +72,17 @@ function parsePayment(body: AsaasEvent) {
   const data = (p.paymentDate || p.confirmedDate || p.dateCreated || new Date().toISOString())
     .slice(0, 10)
 
+  const produto = p.externalReference?.trim() || 'Geral'
+
   return {
-    produto:         (p.externalReference?.trim() || 'Geral'),
+    produto,
     cliente:         null,                          // customer = id no Asaas; nome buscar via API se quiser
     cliente_id:      p.customer,
     valor:           p.netValue ?? p.value,         // usa netValue (descontada taxa Asaas) se disponível
     data,
     tipo:            (p.cycle || p.subscription) ? 'recorrente' : 'pontual',
     forma_pagamento: mapFormaPagamento(p.billingType),
-    descricao:       p.description ?? undefined,
+    descricao:       (p.description?.trim() || `Pagamento ${produto} · Asaas ${p.id}`),
     origem:          'asaas',
     origem_id:       `asaas:${p.id}`,
     payload_raw:     body,
