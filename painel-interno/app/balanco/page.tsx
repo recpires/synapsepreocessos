@@ -201,15 +201,25 @@ export default function BalancoPage() {
           </div>
         </div>
 
-        {/* Versão impressa: header limpo */}
-        <div className="hidden print:block mb-8">
-          <h1 className="text-3xl font-bold text-black mb-2">Balanço Semestral — Synapse Code</h1>
-          <p className="text-gray-700 text-base">
-            {semestre === 'S1' ? '1º Semestre' : '2º Semestre'} de {ano} —
-            {' '}{semestre === 'S1' ? 'Janeiro a Junho' : 'Julho a Dezembro'}
-          </p>
-          <p className="text-gray-500 text-sm mt-1">Emitido em {hoje.toLocaleDateString('pt-BR')}</p>
-          <hr className="mt-4 border-gray-300" />
+        {/* Versão impressa: cabeçalho executivo */}
+        <div className="hidden print:block print-header">
+          <div className="print-header-top">
+            <div>
+              <p className="print-eyebrow">SYNAPSE CODE</p>
+              <h1 className="print-title">Balanço Semestral</h1>
+              <p className="print-subtitle">
+                {semestre === 'S1' ? '1º Semestre' : '2º Semestre'} de {ano}
+                {' · '}
+                {semestre === 'S1' ? 'Janeiro a Junho' : 'Julho a Dezembro'}
+              </p>
+            </div>
+            <div className="print-header-meta">
+              <p><strong>Emitido em</strong></p>
+              <p>{hoje.toLocaleDateString('pt-BR')}</p>
+              <p className="print-meta-small">Painel Interno · Confidencial</p>
+            </div>
+          </div>
+          <div className="print-divider" />
         </div>
 
         {loading ? (
@@ -378,10 +388,14 @@ export default function BalancoPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-[#1e1e2e] print:border-gray-300">
-                          {['#','Data','Descrição','Categoria','Produto','Tipo','Valor'].map(h => (
-                            <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-700">{h}</th>
-                          ))}
+                        <tr className="border-b border-[#1e1e2e] print:border-gray-400">
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[4%]">#</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[11%]">Data</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[34%]">Descrição</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[16%]">Categoria</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[14%]">Produto</th>
+                          <th className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[9%]">Tipo</th>
+                          <th className="text-right text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap print:text-gray-800 print:w-[12%]">Valor</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -393,7 +407,7 @@ export default function BalancoPage() {
                             <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700">{d.categoria}</td>
                             <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap print:text-gray-700">{d.produto}</td>
                             <td className="px-4 py-2.5 text-gray-500 capitalize whitespace-nowrap print:text-gray-700">{d.tipo}</td>
-                            <td className="px-4 py-2.5 text-red-400 font-semibold whitespace-nowrap print:text-red-700">{fmt(Number(d.valor))}</td>
+                            <td className="px-4 py-2.5 text-right text-red-400 font-semibold whitespace-nowrap print:text-red-700">{fmt(Number(d.valor))}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -425,10 +439,221 @@ export default function BalancoPage() {
       {/* Print styles */}
       <style jsx global>{`
         @media print {
-          @page { size: A4; margin: 1.5cm; }
-          body { background: white !important; color: black !important; }
-          aside, header { display: none !important; }
-          .print\\:hidden { display: none !important; }
+          @page {
+            size: A4 portrait;
+            margin: 1.6cm 1.4cm 1.6cm 1.4cm;
+          }
+
+          html, body {
+            background: #ffffff !important;
+            color: #111 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif !important;
+            font-size: 9.5pt !important;
+            line-height: 1.45 !important;
+          }
+
+          /* Esconder shell, sidebar, topbar mobile, controles interativos */
+          aside,
+          .md\\:hidden,
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          /* Anular layout flex do PainelShell para o conteúdo ocupar 100% */
+          body > div,
+          body > div > div,
+          .flex {
+            display: block !important;
+            background: #ffffff !important;
+          }
+          .min-h-screen { min-height: auto !important; }
+
+          /* Container principal */
+          .max-w-7xl {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          main { overflow: visible !important; }
+
+          /* Cabeçalho executivo */
+          .print-header {
+            margin: 0 0 18pt 0 !important;
+            padding-bottom: 14pt;
+            border-bottom: 1.5pt solid #111;
+          }
+          .print-header-top {
+            display: flex !important;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20pt;
+          }
+          .print-eyebrow {
+            font-size: 8pt;
+            letter-spacing: 3pt;
+            color: #7c3aed !important;
+            font-weight: 700;
+            margin: 0 0 6pt 0;
+          }
+          .print-title {
+            font-size: 22pt;
+            font-weight: 700;
+            color: #111 !important;
+            letter-spacing: -0.4pt;
+            margin: 0 0 4pt 0;
+            line-height: 1.1;
+          }
+          .print-subtitle {
+            font-size: 10pt;
+            color: #555 !important;
+            margin: 0;
+          }
+          .print-header-meta {
+            text-align: right;
+            font-size: 9pt;
+            color: #444 !important;
+            min-width: 140pt;
+          }
+          .print-header-meta p { margin: 0 0 2pt 0; }
+          .print-meta-small {
+            font-size: 7.5pt;
+            color: #888 !important;
+            letter-spacing: 0.5pt;
+            text-transform: uppercase;
+            margin-top: 6pt !important;
+          }
+          .print-divider {
+            display: none;
+          }
+
+          /* Títulos de seção */
+          h2 {
+            font-size: 12pt !important;
+            font-weight: 700 !important;
+            color: #111 !important;
+            margin: 18pt 0 8pt 0 !important;
+            padding-bottom: 4pt;
+            border-bottom: 0.5pt solid #ccc;
+            letter-spacing: 0.2pt;
+          }
+          h3 {
+            font-size: 10pt !important;
+            font-weight: 600 !important;
+            color: #222 !important;
+            margin: 0 0 8pt 0 !important;
+          }
+
+          /* Cards / boxes */
+          .bg-\\[\\#111118\\],
+          .bg-\\[\\#0a0a0f\\],
+          .bg-\\[\\#0f0f17\\] {
+            background: #fafafa !important;
+          }
+          .border-\\[\\#1e1e2e\\],
+          .border-\\[\\#2d2d3d\\] {
+            border-color: #d0d0d0 !important;
+          }
+          .rounded-xl { border-radius: 6pt !important; }
+
+          /* Grid de KPIs mais compacto */
+          .grid {
+            display: grid !important;
+            gap: 8pt !important;
+          }
+          .grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
+          .lg\\:grid-cols-4 { grid-template-columns: repeat(4, 1fr) !important; }
+          .sm\\:grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+          .lg\\:grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+          /* KPI cards */
+          .p-4, .p-5, .sm\\:p-5 {
+            padding: 10pt !important;
+          }
+          .text-xl, .sm\\:text-2xl, .text-2xl {
+            font-size: 14pt !important;
+          }
+          .text-\\[10px\\], .text-xs, .sm\\:text-xs {
+            font-size: 7.5pt !important;
+          }
+
+          /* Tabelas */
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            font-size: 8.5pt !important;
+            table-layout: fixed !important;
+          }
+          table th {
+            font-weight: 600 !important;
+            font-size: 7.5pt !important;
+            text-transform: uppercase;
+            letter-spacing: 0.4pt;
+            color: #555 !important;
+            padding: 5pt 6pt !important;
+            border-bottom: 1pt solid #999 !important;
+            background: #f5f5f7 !important;
+          }
+          table td {
+            padding: 4pt 6pt !important;
+            border-bottom: 0.4pt solid #e0e0e0 !important;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+          table tbody tr:last-child td { border-bottom: 0.4pt solid #999 !important; }
+
+          /* Remover overflow horizontal */
+          .overflow-x-auto, .overflow-hidden, .overflow-y-auto {
+            overflow: visible !important;
+          }
+
+          /* Inputs (receita por produto) — exibir valor em vez do campo */
+          input { display: none !important; }
+
+          /* Page breaks */
+          .print\\:break-inside-avoid,
+          section,
+          table {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          h2 { break-after: avoid; page-break-after: avoid; }
+
+          /* Recharts — limitar altura para caber */
+          .recharts-wrapper { max-width: 100% !important; }
+
+          /* Cores explícitas (escape para forçar) */
+          .print\\:text-black { color: #111 !important; }
+          .print\\:text-gray-700 { color: #555 !important; }
+          .print\\:text-gray-800 { color: #333 !important; }
+          .print\\:text-emerald-700 { color: #047857 !important; }
+          .print\\:text-red-700 { color: #b91c1c !important; }
+          .print\\:text-violet-700 { color: #6d28d9 !important; }
+          .print\\:text-blue-700 { color: #1d4ed8 !important; }
+          .print\\:text-yellow-700 { color: #a16207 !important; }
+          .print\\:bg-white { background: #ffffff !important; }
+          .print\\:bg-gray-50 { background: #fafafa !important; }
+          .print\\:bg-gray-100 { background: #f3f3f3 !important; }
+          .print\\:border-gray-200 { border-color: #e5e5e5 !important; }
+          .print\\:border-gray-300 { border-color: #d0d0d0 !important; }
+          .print\\:border-gray-400 { border-color: #999 !important; }
+
+          /* Linha de totais na tabela de receitas */
+          .bg-\\[\\#0a0a0f\\].font-bold,
+          tr.bg-\\[\\#0a0a0f\\] {
+            background: #f0f0f3 !important;
+          }
+          tr.bg-\\[\\#0a0a0f\\] td {
+            border-top: 1pt solid #888 !important;
+            font-weight: 700 !important;
+          }
+
+          /* Síntese final mais discreta */
+          ul li {
+            margin-bottom: 3pt;
+          }
         }
       `}</style>
     </PainelShell>

@@ -191,18 +191,34 @@ export default function EmpresaPage() {
   async function handleSave(c: ContratoInsert, file?: File) {
     let arquivo_url: string | undefined
     let arquivo_nome: string | undefined
+
     if (file) {
       const ext  = file.name.split('.').pop()
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { data: up, error } = await supabase.storage
+      const path = `empresa/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { data: up, error: upErr } = await supabase.storage
         .from('contratos-arquivos')
         .upload(path, file, { contentType: file.type, upsert: false })
-      if (!error && up) {
+
+      if (upErr || !up) {
+        console.error('[empresa] erro no upload do arquivo:', upErr)
+        alert(`Falha ao subir o PDF: ${upErr?.message ?? 'erro desconhecido'}\n\nO documento será salvo sem o anexo.`)
+      } else {
         const { data: url } = supabase.storage.from('contratos-arquivos').getPublicUrl(up.path)
-        arquivo_url = url.publicUrl; arquivo_nome = file.name
+        arquivo_url  = url.publicUrl
+        arquivo_nome = file.name
       }
     }
-    await supabase.from('contratos').insert({ ...c, lado: 'empresa', arquivo_url, arquivo_nome })
+
+    const { error: insertErr } = await supabase
+      .from('contratos')
+      .insert({ ...c, lado: 'empresa', arquivo_url, arquivo_nome })
+
+    if (insertErr) {
+      console.error('[empresa] erro ao inserir contrato:', insertErr)
+      alert(`Erro ao salvar: ${insertErr.message}`)
+      return
+    }
+
     setModal(false); fetchDocumentos()
   }
 
