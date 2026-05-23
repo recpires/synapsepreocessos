@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programação do Evento</title>
+<style>
+  :root {
+    --bg: #0f1020;
+    --bg2: #16182e;
+    --card: #1b1e3a;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f3f1ff;
+    --muted: #a3a0c8;
+    --gold: #e9c46a;
+    --gold2: #f4d58d;
+    --accent: #8b7df7;
+    --accent2: #b3a4ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(139,125,247,0.18), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 16px 64px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  /* HEADER */
+  header {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .kicker {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid rgba(233,196,106,0.35);
+    padding: 6px 16px;
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  header h1 {
+    font-size: clamp(28px, 6vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--gold2), var(--accent2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  header p {
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .totals {
+    margin-top: 18px;
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .pill {
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 999px;
+  }
+  .pill strong { color: var(--text); font-weight: 700; }
+
+  /* BLOCKS */
+  .block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 4px 0 8px;
+    margin-bottom: 22px;
+    overflow: hidden;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+  }
+  .block-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .block-num {
+    flex: none;
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    font-weight: 800;
+    font-size: 18px;
+    color: #1b1430;
+    background: linear-gradient(135deg, var(--gold2), var(--gold));
+    box-shadow: 0 6px 16px rgba(233,196,106,0.3);
+  }
+  .block-title { flex: 1; }
+  .block-title h2 {
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .block-time {
+    font-size: 13px;
+    color: var(--gold);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ITEMS */
+  ul.items { list-style: none; padding: 8px 22px 6px; }
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .item:last-child { border-bottom: none; }
+  .hour {
+    flex: none;
+    width: 56px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--accent2);
+    font-size: 15px;
+    padding-top: 1px;
+  }
+  .desc { flex: 1; }
+  .desc .name { font-weight: 600; font-size: 15px; }
+  .desc .note {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .tag {
+    flex: none;
+    align-self: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+    color: var(--accent2);
+    background: rgba(139,125,247,0.14);
+    border: 1px solid rgba(139,125,247,0.3);
+    white-space: nowrap;
+  }
+  .tag.word { color: var(--gold); background: rgba(233,196,106,0.12); border-color: rgba(233,196,106,0.32); }
+  .tag.final { color: #7ee0b8; background: rgba(52,211,153,0.12); border-color: rgba(52,211,153,0.32); }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 32px;
+  }
+
+  @media (max-width: 480px) {
+    .block-head { flex-wrap: wrap; }
+    .block-time { width: 100%; padding-left: 56px; }
+    .item { gap: 12px; }
+    .tag { display: none; }
+  }
+
+  @media print {
+    body { background: #fff; color: #111; padding: 0; }
+    .block, .pill { box-shadow: none; }
+    header h1 { -webkit-text-fill-color: #4a3aa0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="kicker">Programação</span>
+    <h1>Encontro de Louvor</h1>
+    <p>Roteiro completo do evento &middot; 16h00 às 18h10</p>
+    <div class="totals">
+      <span class="pill"><strong>5</strong> blocos</span>
+      <span class="pill"><strong>2h10</strong> de duração</span>
+      <span class="pill"><strong>10</strong> participações</span>
+    </div>
+  </header>
+
+  <!-- BLOCO 1 -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">1</div>
+      <div class="block-title"><h2>Abertura Especial</h2></div>
+      <div class="block-time">16:00 – 16:25</div>
+    </div>
+    <ul class="items">
+      <li class="item">
+        <span class="hour">16:00</span>
+        <span class="desc"><span class="name">Abertura / Boas-vindas</span></span>
+      </li>
+      <li class="item">
+        <span class="hour">16:05</span>
+        <span class="desc"><span class="name">Louvor com a Igreja</span><span class="note">2 músicas congregacionais</span></span>
+        <span class="tag">2 músicas</span>
+      </li>
+      <li class="item">
+        <span class="hour">16:15</span>
+        <span class="desc"><span class="name">Quarteto Musivoz</span><span class="note">3 músicas seguidas — Liberação</span></span>
+        <span class="tag">3 músicas</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- BLOCO 2 -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">2</div>
+      <div class="block-title"><h2>Primeira Parte</h2></div>
+      <div class="block-time">16:25 – 17:20</div>
+    </div>
+    <ul class="items">
+      <li class="item">
+        <span class="hour">16:25</span>
+        <span class="desc"><span class="name">Ministério Jaspe</span><span class="note">3 músicas seguidas — Apresentação Única</span></span>
+        <span class="tag">3 músicas</span>
+      </li>
+      <li class="item">
+        <span class="hour">16:40</span>
+        <span class="desc"><span class="name">Quarteto Jubilus Diadema</span></span>
+        <span class="tag">2 músicas</span>
+      </li>
+      <li class="item">
+        <span class="hour">16:50</span>
+        <span class="desc"><span class="name">Ministério CADES</span></span>
+        <span class="tag">2 músicas</span>
+      </li>
+      <li class="item">
+        <span class="hour">17:00</span>
+        <span class="desc"><span class="name">Grupo JELD</span></span>
+        <span class="tag">2 músicas</span>
+      </li>
+      <li class="item">
+        <span class="hour">17:10</span>
+        <span class="desc"><span class="name">Família Tigre</span></span>
+        <span class="tag">2 músicas</span>
+      </li>
+      <li class="item">
+        <span class="hour">17:15</span>
+        <span class="desc"><span class="name">Quarteto Jubilus Campanário</span></span>
+        <span class="tag">2 músicas</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- BLOCO 3 -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">3</div>
+      <div class="block-title"><h2>Palavra</h2></div>
+      <div class="block-time">17:20 – 17:35</div>
+    </div>
+    <ul class="items">
+      <li class="item">
+        <span class="hour">17:20</span>
+        <span class="desc"><span class="name">Sermão — Pastor Webber</span><span class="note">15 minutos</span></span>
+        <span class="tag word">Pregação</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- BLOCO 4 -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">4</div>
+      <div class="block-title"><h2>Segunda Parte</h2></div>
+      <div class="block-time">17:35 – 18:00</div>
+    </div>
+    <ul class="items">
+      <li class="item">
+        <span class="hour">17:35</span>
+        <span class="desc"><span class="name">Quarteto Jubilus Campanário</span></span>
+        <span class="tag">1 música</span>
+      </li>
+      <li class="item">
+        <span class="hour">17:40</span>
+        <span class="desc"><span class="name">Família Tigre</span></span>
+        <span class="tag">1 música</span>
+      </li>
+      <li class="item">
+        <span class="hour">17:45</span>
+        <span class="desc"><span class="name">Grupo JELD</span></span>
+        <span class="tag">1 música</span>
+      </li>
+      <li class="item">
+        <span class="hour">17:50</span>
+        <span class="desc"><span class="name">Ministério CADES</span></span>
+        <span class="tag">1 música</span>
+      </li>
+      <li class="item">
+        <span class="hour">17:55</span>
+        <span class="desc"><span class="name">Quarteto Jubilus Diadema</span></span>
+        <span class="tag">1 música</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- BLOCO 5 -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">5</div>
+      <div class="block-title"><h2>Encerramento</h2></div>
+      <div class="block-time">18:00 – 18:10</div>
+    </div>
+    <ul class="items">
+      <li class="item">
+        <span class="hour">18:00</span>
+        <span class="desc"><span class="name">Todos os Grupos</span><span class="note">Música: “Jerusalém”</span></span>
+        <span class="tag final">Conjunto</span>
+      </li>
+      <li class="item">
+        <span class="hour">18:05</span>
+        <span class="desc"><span class="name">Oração Final / Encerramento</span></span>
+        <span class="tag final">Final</span>
+      </li>
+    </ul>
+  </section>
+
+  <footer>Programação sujeita a ajustes conforme o andamento do evento.</footer>
+</div>
+</body>
+</html>
