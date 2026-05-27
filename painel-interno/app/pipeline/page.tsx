@@ -3,8 +3,6 @@
 import { useEffect, useState, useRef } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
-import SubNav from '@/components/SubNav'
-import { SUBNAV } from '@/lib/nav'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Tipo = 'comercial' | 'projeto'
@@ -308,10 +306,6 @@ export default function PipelinePage() {
 
         {/* Header */}
         <div className="px-6 py-5 border-b border-[#1e1e2e] flex-shrink-0">
-          <div className="mb-4">
-            <SubNav tabs={SUBNAV.comercial} />
-          </div>
-
           {/* Tipo tabs */}
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="flex gap-1 bg-[#0d0d14] border border-[#1e1e2e] rounded-xl p-1">

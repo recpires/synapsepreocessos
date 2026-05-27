@@ -10,6 +10,7 @@ const NAV = [
   { href: '/overview',   icon: '🏠', label: 'Visão Geral' },
   { href: '/produtos',   icon: '📦', label: 'Produtos' },
   { href: '/dev',        icon: '⚙️',  label: 'Desenvolvimento' },
+  { href: '/pipeline',   icon: '📈', label: 'Pipeline' },
   { href: '/comercial',  icon: '💼', label: 'Comercial' },
   { href: '/marketing',  icon: '📣', label: 'Marketing' },
   { href: '/financeiro', icon: '💰', label: 'Financeiro' },
@@ -22,7 +23,6 @@ const NAV = [
 const NAV_GRUPOS: Record<string, string[]> = {
   '/financeiro': ['/receitas', '/balanco'],
   '/empresa':    ['/documentos', '/contratos'],
-  '/comercial':  ['/pipeline'],
   '/dev':        ['/testes'],
 }
 

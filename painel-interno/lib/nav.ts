@@ -22,7 +22,6 @@ export const SUBNAV = {
   ],
   comercial: [
     { href: '/comercial', label: 'Comercial', icon: '💼' },
-    { href: '/pipeline',  label: 'Pipeline',  icon: '📈' },
   ],
   dev: [
     { href: '/dev',    label: 'Desenvolvimento', icon: '⚙️' },
