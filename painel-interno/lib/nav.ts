@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Configuração dos grupos de subnavegação.
  * Cada grupo aparece como uma barra de abas no topo da pagina pai e das filhas.
  */

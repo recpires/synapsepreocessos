@@ -1,7 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
+import {
+  fetchNeroBarberAdmin, updateNeroShopPlan,
+  fetchKubicEngAdmin, updateKubicUserPlan,
+  type NeroAdminData, type KubicAdminData, type NeroPlan, type KubicPlan,
+} from '@/lib/supabase/server'
 
 /* ─── Tipos ───────────────────────────────────────────────────── */
 interface Cor    { nome: string; hex: string; uso: string }
@@ -435,6 +440,271 @@ const DOC_COR: Record<Doc['tipo'], { bg: string; text: string; label: string }> 
   deploy:     { bg: 'bg-cyan-900/30',   text: 'text-cyan-300',   label: 'Deploy / Docs' },
 }
 
+/* ─── AdminSaaS ──────────────────────────────────────────────── */
+const STATUS_CLS: Record<string, string> = {
+  active:    'bg-emerald-900/30 text-emerald-400',
+  trial:     'bg-amber-900/30  text-amber-400',
+  cancelled: 'bg-red-900/30    text-red-400',
+  expired:   'bg-red-900/30    text-red-400',
+}
+const ROLE_CLS: Record<string, string> = {
+  superadmin: 'bg-red-900/30    text-red-400',
+  admin:      'bg-violet-900/30 text-violet-400',
+  user:       'bg-gray-800/60   text-gray-400',
+}
+function fmtDate(d: string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
+function AdminSaaS({ productId }: { productId: string }) {
+  const [expanded,  setExpanded]  = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const [loaded,    setLoaded]    = useState(false)
+  const [error,     setError]     = useState<string | null>(null)
+  const [neroData,  setNeroData]  = useState<NeroAdminData | null>(null)
+  const [kubicData, setKubicData] = useState<KubicAdminData | null>(null)
+  const [pending,   setPending]   = useState<Record<string, string>>({})
+  const [saving,    setSaving]    = useState<Record<string, boolean>>({})
+  const [savedOk,   setSavedOk]   = useState<Record<string, boolean>>({})
+
+  const loadData = useCallback(async () => {
+    if (loaded) return
+    setLoading(true); setError(null)
+    try {
+      if (productId === 'nero-barber') {
+        const r = await fetchNeroBarberAdmin()
+        if (r.error) setError(r.error); else if (r.data) setNeroData(r.data)
+      } else if (productId === 'kubic-eng') {
+        const r = await fetchKubicEngAdmin()
+        if (r.error) setError(r.error); else if (r.data) setKubicData(r.data)
+      }
+      setLoaded(true)
+    } catch (e: unknown) { setError((e as Error).message) }
+    finally { setLoading(false) }
+  }, [productId, loaded])
+
+  const toggle = () => {
+    const next = !expanded; setExpanded(next)
+    if (next && !loaded) loadData()
+  }
+
+  const savePlan = async (entityId: string, planId: string) => {
+    setSaving(p => ({ ...p, [entityId]: true }))
+    try {
+      let r: { ok: boolean; error?: string }
+      if (productId === 'nero-barber') {
+        r = await updateNeroShopPlan(entityId, planId)
+        if (r.ok) setNeroData(prev => prev ? { ...prev, shops: prev.shops.map(s => s.id !== entityId ? s : { ...s, current_plan_id: planId, plan_name: (prev.plans as NeroPlan[]).find(p => p.id === planId)?.name ?? planId, plan_price: (prev.plans as NeroPlan[]).find(p => p.id === planId)?.price ?? 0 }) } : null)
+      } else {
+        r = await updateKubicUserPlan(entityId, planId)
+        if (r.ok) setKubicData(prev => prev ? { ...prev, users: prev.users.map(u => u.id !== entityId ? u : { ...u, plan_id: planId, plan_name: (prev.plans as KubicPlan[]).find(p => p.id === planId)?.name ?? planId, plan_price: (prev.plans as KubicPlan[]).find(p => p.id === planId)?.price ?? 0 }) } : null)
+      }
+      if (r.ok) {
+        setSavedOk(p => ({ ...p, [entityId]: true }))
+        setPending(p => { const n = { ...p }; delete n[entityId]; return n })
+        setTimeout(() => setSavedOk(p => { const n = { ...p }; delete n[entityId]; return n }), 2500)
+      } else { setError(r.error ?? 'Erro ao salvar plano') }
+    } finally { setSaving(p => { const n = { ...p }; delete n[entityId]; return n }) }
+  }
+
+  if (productId !== 'nero-barber' && productId !== 'kubic-eng') return null
+
+  return (
+    <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
+      {/* Header */}
+      <button onClick={toggle} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#0d0d14] transition-colors">
+        <div className="flex items-center gap-2.5">
+          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+          <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">Painel Admin</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-400 border border-red-800/30 font-semibold">Restrito</span>
+          {loaded && !loading && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-400 border border-emerald-800/30">✓ carregado</span>}
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-[#1e1e2e] p-5 space-y-5">
+          {loading && (
+            <div className="flex items-center gap-3 text-sm text-gray-500 py-4">
+              <div className="w-5 h-5 rounded-full border-2 border-gray-700 border-t-violet-500 animate-spin flex-shrink-0" />
+              Consultando banco de dados...
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-900/20 border border-red-800/40 rounded-lg px-4 py-3">
+              <p className="text-sm font-medium text-red-400 mb-0.5">⚠️ Erro ao carregar</p>
+              <p className="text-xs text-red-400/70 font-mono">{error}</p>
+            </div>
+          )}
+
+          {/* NERO BARBER DATA */}
+          {neroData && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {[
+                  { label: 'Barbearias',  val: neroData.shops.length },
+                  { label: 'Ativas',       val: neroData.shops.filter(s => s.subscription_status === 'active').length, cls: 'text-emerald-400' },
+                  { label: 'Trial',        val: neroData.shops.filter(s => s.subscription_status === 'trial').length,  cls: 'text-amber-400'  },
+                  { label: 'Usuários',     val: neroData.total_profiles },
+                  { label: 'MRR estimado', val: `R$${neroData.mrr.toLocaleString('pt-BR')}`, cls: 'text-violet-400' },
+                ].map(k => (
+                  <div key={k.label} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg p-3 text-center">
+                    <div className={`text-xl font-bold ${k.cls ?? 'text-white'}`}>{k.val}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <p className="text-[11px] text-gray-600 uppercase tracking-wider font-medium mb-2.5">Barbearias</p>
+                <div className="overflow-x-auto rounded-lg border border-[#1e1e2e]">
+                  <table className="w-full text-sm min-w-[700px]">
+                    <thead className="bg-[#0d0d14]">
+                      <tr>{['Nome', 'Localização', 'Plano', 'Status', 'Trial/Venc.', 'Cadastro', 'Mudar plano'].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-[10px] text-gray-600 uppercase tracking-wider font-medium text-left first:pl-4 last:pr-4">{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {neroData.shops.map((shop, i) => (
+                        <tr key={shop.id} className={`border-t border-[#1e1e2e] hover:bg-[#0d0d14] transition-colors ${i % 2 ? 'bg-[#0a0a10]' : ''}`}>
+                          <td className="px-4 py-2.5 font-medium text-gray-200 max-w-[150px]"><span className="block truncate" title={shop.name}>{shop.name}</span></td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{shop.city && shop.uf ? `${shop.city}/${shop.uf}` : '—'}</td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <span className="text-xs font-medium text-gray-300">{shop.plan_name}</span>
+                            <span className="text-[11px] text-gray-600 ml-1.5">R${shop.plan_price}</span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[shop.subscription_status] ?? 'text-gray-400'}`}>{shop.subscription_status}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(shop.trial_ends_at)}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(shop.created_at)}</td>
+                          <td className="px-3 pr-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <select value={pending[shop.id] ?? shop.current_plan_id} onChange={e => setPending(p => ({ ...p, [shop.id]: e.target.value }))} className="text-xs bg-[#1e1e2e] border border-[#2a2a3e] rounded px-2 py-1 text-gray-300 focus:outline-none focus:border-violet-500 cursor-pointer">
+                                {neroData.plans.map(pl => <option key={pl.id} value={pl.id}>{pl.name} — R${pl.price}</option>)}
+                              </select>
+                              {pending[shop.id] && pending[shop.id] !== shop.current_plan_id && (
+                                <button onClick={() => savePlan(shop.id, pending[shop.id])} disabled={saving[shop.id]} className="text-[11px] px-2.5 py-1 rounded bg-violet-600 hover:bg-violet-500 text-white font-medium disabled:opacity-40 whitespace-nowrap">
+                                  {saving[shop.id] ? '...' : 'Salvar'}
+                                </button>
+                              )}
+                              {savedOk[shop.id] && <span className="text-[11px] text-emerald-400 whitespace-nowrap">✓ salvo</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[11px] text-gray-600 uppercase tracking-wider font-medium mb-2">Planos cadastrados</p>
+                <div className="flex flex-wrap gap-2">
+                  {neroData.plans.map(pl => (
+                    <div key={pl.id} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg px-3 py-2 text-xs">
+                      <span className="font-semibold text-gray-200">{pl.name}</span>
+                      <span className="text-gray-500 ml-2">R${pl.price}/mês · R${pl.annual_price}/ano</span>
+                      <span className="text-gray-600 ml-2">até {pl.max_barbers} barbeiros · {pl.max_units} un.</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 text-xs text-gray-600 pt-2 border-t border-[#1e1e2e]">
+                <span>🗓️ {neroData.total_appointments.toLocaleString('pt-BR')} agendamentos</span>
+                <span>👥 {neroData.total_customers.toLocaleString('pt-BR')} clientes</span>
+              </div>
+            </>
+          )}
+
+          {/* KUBIC ENG DATA */}
+          {kubicData && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Usuários', val: kubicData.users.length },
+                  { label: 'Ativos',   val: kubicData.users.filter(u => u.sub_status === 'active').length, cls: 'text-emerald-400' },
+                  { label: 'Trial',    val: kubicData.users.filter(u => u.sub_status === 'trial').length,  cls: 'text-amber-400'  },
+                  { label: 'MRR',      val: `R$${kubicData.mrr.toLocaleString('pt-BR')}`,                  cls: 'text-violet-400' },
+                ].map(k => (
+                  <div key={k.label} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg p-3 text-center">
+                    <div className={`text-xl font-bold ${k.cls ?? 'text-white'}`}>{k.val}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <p className="text-[11px] text-gray-600 uppercase tracking-wider font-medium mb-2.5">Usuários</p>
+                <div className="overflow-x-auto rounded-lg border border-[#1e1e2e]">
+                  <table className="w-full text-sm min-w-[800px]">
+                    <thead className="bg-[#0d0d14]">
+                      <tr>{['Nome', 'Email', 'Role', 'Plano', 'Status', 'Trial até', 'Cadastro', 'Mudar plano'].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-[10px] text-gray-600 uppercase tracking-wider font-medium text-left first:pl-4 last:pr-4">{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {kubicData.users.map((user, i) => (
+                        <tr key={user.id} className={`border-t border-[#1e1e2e] hover:bg-[#0d0d14] transition-colors ${i % 2 ? 'bg-[#0a0a10]' : ''}`}>
+                          <td className="px-4 py-2.5 font-medium text-gray-200 max-w-[130px]"><span className="block truncate" title={user.name}>{user.name}</span></td>
+                          <td className="px-3 py-2.5 text-xs text-gray-400 max-w-[170px]"><span className="block truncate" title={user.email}>{user.email}</span></td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${ROLE_CLS[user.role] ?? 'bg-gray-800/60 text-gray-400'}`}>{user.role}</span>
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {user.plan_name ? <><span className="text-xs font-medium text-gray-300">{user.plan_name}</span>{user.plan_price != null && <span className="text-[11px] text-gray-600 ml-1.5">R${user.plan_price}</span>}</> : <span className="text-gray-600 text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {user.sub_status ? <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[user.sub_status] ?? 'text-gray-400'}`}>{user.sub_status}</span> : <span className="text-gray-600 text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(user.trial_end)}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(user.created_at)}</td>
+                          <td className="px-3 pr-4 py-2.5">
+                            {user.plan_id ? (
+                              <div className="flex items-center gap-2">
+                                <select value={pending[user.id] ?? user.plan_id} onChange={e => setPending(p => ({ ...p, [user.id]: e.target.value }))} className="text-xs bg-[#1e1e2e] border border-[#2a2a3e] rounded px-2 py-1 text-gray-300 focus:outline-none focus:border-violet-500 cursor-pointer">
+                                  {kubicData.plans.map(pl => <option key={pl.id} value={pl.id}>{pl.name} — {pl.price > 0 ? `R$${pl.price}` : 'Custom'}</option>)}
+                                </select>
+                                {pending[user.id] && pending[user.id] !== user.plan_id && (
+                                  <button onClick={() => savePlan(user.id, pending[user.id])} disabled={saving[user.id]} className="text-[11px] px-2.5 py-1 rounded bg-violet-600 hover:bg-violet-500 text-white font-medium disabled:opacity-40 whitespace-nowrap">
+                                    {saving[user.id] ? '...' : 'Salvar'}
+                                  </button>
+                                )}
+                                {savedOk[user.id] && <span className="text-[11px] text-emerald-400 whitespace-nowrap">✓ salvo</span>}
+                              </div>
+                            ) : <span className="text-[11px] text-gray-600">sem assinatura</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[11px] text-gray-600 uppercase tracking-wider font-medium mb-2">Planos disponíveis</p>
+                <div className="flex flex-wrap gap-2">
+                  {kubicData.plans.map(pl => (
+                    <div key={pl.id} className={`border rounded-lg px-3 py-2 text-xs ${pl.is_active ? 'bg-[#0d0d14] border-[#1e1e2e]' : 'bg-[#0d0d14] border-[#1e1e2e] opacity-40'}`}>
+                      <span className="font-semibold text-gray-200">{pl.name}</span>
+                      {pl.price > 0 ? <span className="text-gray-500 ml-2">R${pl.price}/mês · R${pl.price_annual}/ano</span> : <span className="text-gray-500 ml-2">Personalizado</span>}
+                      {pl.max_users > 0 && <span className="text-gray-600 ml-2">até {pl.max_users} users</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ─── Componente principal ───────────────────────────────────── */
 export default function ProdutosPage() {
   const [ativo, setAtivo] = useState('nero-barber')
@@ -738,6 +1008,9 @@ export default function ProdutosPage() {
               <p className="text-sm text-gray-500 italic">Documentação a criar após definição do produto.</p>
             </div>
           )}
+
+          {/* Admin — só para produtos com integração direta ao Supabase */}
+          <AdminSaaS productId={produto.id} />
 
         </div>
       </div>
