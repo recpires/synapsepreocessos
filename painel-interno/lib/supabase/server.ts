@@ -226,6 +226,57 @@ export type PsiAuraAdminData = {
   totalClinics: number; activeCount: number; pastDueCount: number; mrr: number
 }
 
+// ─── Nexio CRM admin ──────────────────────────────────────────────────────────
+
+export type NexioTenant = {
+  id: string; nome: string; slug: string; plano: string
+  totalUsuarios: number; totalNegocios: number; totalClientes: number; criadoEm: string
+}
+export type NexioAdminData = {
+  totalTenants: number; tenantsTrial: number; tenantsFreelancer: number
+  tenantsAgencyPro: number; tenantsScale: number
+  totalUsuarios: number; totalClientes: number; totalNegocios: number
+  totalAtividades: number; valorTotalPipeline: number
+  recentesTenants: NexioTenant[]
+}
+
+export async function fetchNexioAdmin(): Promise<{ data?: NexioAdminData; error?: string }> {
+  try {
+    const url = process.env.NEXIO_API_URL
+    const key = process.env.NEXIO_ADMIN_KEY
+    if (!url || !key) throw new Error('Configure NEXIO_API_URL e NEXIO_ADMIN_KEY no .env.local')
+
+    const res = await fetch(`${url}/admin/metricas`, {
+      headers: { 'X-Synapse-Key': key },
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`HTTP ${res.status}: ${text}`)
+    }
+    const d = await res.json()
+    return {
+      data: {
+        totalTenants:      d.totalTenants      ?? 0,
+        tenantsTrial:      d.tenantsTrial      ?? 0,
+        tenantsFreelancer: d.tenantsFreelancer ?? 0,
+        tenantsAgencyPro:  d.tenantsAgencyPro  ?? 0,
+        tenantsScale:      d.tenantsScale      ?? 0,
+        totalUsuarios:     d.totalUsuarios     ?? 0,
+        totalClientes:     d.totalClientes     ?? 0,
+        totalNegocios:     d.totalNegocios     ?? 0,
+        totalAtividades:   d.totalAtividades   ?? 0,
+        valorTotalPipeline: Number(d.valorTotalPipeline ?? 0),
+        recentesTenants: (d.recentesTenants ?? []).map((t: NexioTenant) => ({
+          id: t.id, nome: t.nome, slug: t.slug, plano: t.plano,
+          totalUsuarios: t.totalUsuarios, totalNegocios: t.totalNegocios,
+          totalClientes: t.totalClientes, criadoEm: t.criadoEm,
+        })),
+      }
+    }
+  } catch (e: unknown) { return { error: (e as Error).message } }
+}
+
 export async function fetchPsiAuraAdmin(): Promise<{ data?: PsiAuraAdminData; error?: string }> {
   try {
     const url = process.env.PSI_AURA_API_URL

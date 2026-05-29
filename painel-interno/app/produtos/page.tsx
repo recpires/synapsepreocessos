@@ -5,9 +5,9 @@ import PainelShell from '@/components/PainelShell'
 import {
   fetchNeroBarberAdmin, updateNeroShopPlan,
   fetchKubicEngAdmin, updateKubicUserPlan,
-  fetchPsiAuraAdmin,
+  fetchPsiAuraAdmin, fetchNexioAdmin,
   type NeroAdminData, type KubicAdminData, type NeroPlan, type KubicPlan,
-  type PsiAuraAdminData,
+  type PsiAuraAdminData, type NexioAdminData,
 } from '@/lib/supabase/server'
 
 /* ─── Tipos ───────────────────────────────────────────────────── */
@@ -470,6 +470,7 @@ function AdminSaaS({ productId }: { productId: string }) {
   const [neroData,  setNeroData]  = useState<NeroAdminData | null>(null)
   const [kubicData, setKubicData] = useState<KubicAdminData | null>(null)
   const [psiData,   setPsiData]   = useState<PsiAuraAdminData | null>(null)
+  const [nexioData, setNexioData] = useState<NexioAdminData | null>(null)
   const [pending,   setPending]   = useState<Record<string, string>>({})
   const [saving,    setSaving]    = useState<Record<string, boolean>>({})
   const [savedOk,   setSavedOk]   = useState<Record<string, boolean>>({})
@@ -487,6 +488,9 @@ function AdminSaaS({ productId }: { productId: string }) {
       } else if (productId === 'psi-aura') {
         const r = await fetchPsiAuraAdmin()
         if (r.error) setError(r.error); else if (r.data) setPsiData(r.data)
+      } else if (productId === 'crm-nexio') {
+        const r = await fetchNexioAdmin()
+        if (r.error) setError(r.error); else if (r.data) setNexioData(r.data)
       }
       setLoaded(true)
     } catch (e: unknown) { setError((e as Error).message) }
@@ -517,7 +521,7 @@ function AdminSaaS({ productId }: { productId: string }) {
     } finally { setSaving(p => { const n = { ...p }; delete n[entityId]; return n }) }
   }
 
-  if (productId !== 'nero-barber' && productId !== 'kubic-eng' && productId !== 'psi-aura') return null
+  if (!['nero-barber', 'kubic-eng', 'psi-aura', 'crm-nexio'].includes(productId)) return null
 
   return (
     <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
@@ -705,6 +709,85 @@ function AdminSaaS({ productId }: { productId: string }) {
                     </div>
                   ))}
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* NEXIO CRM DATA */}
+          {nexioData && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Tenants',   val: nexioData.totalTenants },
+                  { label: 'Trial',     val: nexioData.tenantsTrial,     cls: 'text-amber-400'  },
+                  { label: 'Pagos',     val: nexioData.tenantsFreelancer + nexioData.tenantsAgencyPro + nexioData.tenantsScale, cls: 'text-emerald-400' },
+                  { label: 'Pipeline',  val: `R$${nexioData.valorTotalPipeline.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, cls: 'text-violet-400' },
+                ].map(k => (
+                  <div key={k.label} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg p-3 text-center">
+                    <div className={`text-xl font-bold ${k.cls ?? 'text-white'}`}>{k.val}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Usuários',    val: nexioData.totalUsuarios   },
+                  { label: 'Clientes',    val: nexioData.totalClientes   },
+                  { label: 'Negócios',    val: nexioData.totalNegocios   },
+                ].map(k => (
+                  <div key={k.label} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-white">{k.val}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {nexioData.recentesTenants.length > 0 && (
+                <div>
+                  <p className="text-[11px] text-gray-600 uppercase tracking-wider font-medium mb-2.5">Tenants recentes</p>
+                  <div className="overflow-x-auto rounded-lg border border-[#1e1e2e]">
+                    <table className="w-full text-sm min-w-[700px]">
+                      <thead className="bg-[#0d0d14]">
+                        <tr>{['Nome', 'Slug', 'Plano', 'Usuários', 'Negócios', 'Clientes', 'Cadastro'].map(h => (
+                          <th key={h} className="px-3 py-2.5 text-[10px] text-gray-600 uppercase tracking-wider font-medium text-left first:pl-4 last:pr-4">{h}</th>
+                        ))}</tr>
+                      </thead>
+                      <tbody>
+                        {nexioData.recentesTenants.map((t, i) => (
+                          <tr key={t.id} className={`border-t border-[#1e1e2e] hover:bg-[#0d0d14] transition-colors ${i % 2 ? 'bg-[#0a0a10]' : ''}`}>
+                            <td className="px-4 py-2.5 font-medium text-gray-200 max-w-[150px]"><span className="block truncate" title={t.nome}>{t.nome}</span></td>
+                            <td className="px-3 py-2.5 text-xs text-gray-500 font-mono">{t.slug}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                                t.plano === 'trial' ? 'bg-amber-900/30 text-amber-400' :
+                                t.plano === 'scale' ? 'bg-violet-900/30 text-violet-400' :
+                                'bg-emerald-900/30 text-emerald-400'
+                              }`}>{t.plano}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs text-gray-400 text-center">{t.totalUsuarios}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-400 text-center">{t.totalNegocios}</td>
+                            <td className="px-3 py-2.5 text-xs text-gray-400 text-center">{t.totalClientes}</td>
+                            <td className="px-3 pr-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(t.criadoEm)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                {[
+                  { label: 'Freelancer', val: nexioData.tenantsFreelancer },
+                  { label: 'Agency Pro', val: nexioData.tenantsAgencyPro  },
+                  { label: 'Scale',      val: nexioData.tenantsScale      },
+                ].map(p => (
+                  <div key={p.label} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg px-3 py-2 text-xs">
+                    <span className="font-semibold text-gray-200">{p.label}</span>
+                    <span className="text-gray-500 ml-2">{p.val} tenant{p.val !== 1 ? 's' : ''}</span>
+                  </div>
+                ))}
               </div>
             </>
           )}
