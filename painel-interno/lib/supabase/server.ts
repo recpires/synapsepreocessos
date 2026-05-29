@@ -209,3 +209,57 @@ export async function updateKubicUserPlan(
     return { ok: true }
   } catch (e: unknown) { return { ok: false, error: (e as Error).message } }
 }
+
+// ─── Psi Aura admin ───────────────────────────────────────────────────────────
+
+export type PsiAuraPlan = {
+  id: string; name: string; price: number; yearlyPrice: number
+}
+export type PsiAuraClinic = {
+  id: string; clinicName: string; email: string
+  planId: string; planName: string; planPrice: number
+  subscriptionStatus: string; subscriptionEndDate: string | null
+  joinedAt: string; userCount: number
+}
+export type PsiAuraAdminData = {
+  clinics: PsiAuraClinic[]; plans: PsiAuraPlan[]
+  totalClinics: number; activeCount: number; pastDueCount: number; mrr: number
+}
+
+export async function fetchPsiAuraAdmin(): Promise<{ data?: PsiAuraAdminData; error?: string }> {
+  try {
+    const url = process.env.PSI_AURA_API_URL
+    const key = process.env.PSI_AURA_ADMIN_KEY
+    if (!url || !key) throw new Error('Configure PSI_AURA_API_URL e PSI_AURA_ADMIN_KEY no .env.local')
+
+    const res = await fetch(`${url}/api/admin/saas-overview`, {
+      headers: { 'X-Synapse-Key': key },
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`HTTP ${res.status}: ${text}`)
+    }
+    const json = await res.json()
+    if (!json.success) throw new Error(json.message ?? 'Erro desconhecido')
+    const d = json.data
+    return {
+      data: {
+        clinics: (d.clinics ?? []).map((c: PsiAuraClinic) => ({
+          id: c.id, clinicName: c.clinicName, email: c.email,
+          planId: c.planId, planName: c.planName, planPrice: Number(c.planPrice),
+          subscriptionStatus: c.subscriptionStatus,
+          subscriptionEndDate: c.subscriptionEndDate ?? null,
+          joinedAt: c.joinedAt, userCount: c.userCount,
+        })),
+        plans: (d.plans ?? []).map((p: PsiAuraPlan) => ({
+          id: p.id, name: p.name, price: Number(p.price), yearlyPrice: Number(p.yearlyPrice),
+        })),
+        totalClinics: d.totalClinics ?? 0,
+        activeCount: d.activeCount ?? 0,
+        pastDueCount: d.pastDueCount ?? 0,
+        mrr: Number(d.mrr ?? 0),
+      }
+    }
+  } catch (e: unknown) { return { error: (e as Error).message } }
+}

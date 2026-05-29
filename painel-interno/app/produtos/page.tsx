@@ -5,7 +5,9 @@ import PainelShell from '@/components/PainelShell'
 import {
   fetchNeroBarberAdmin, updateNeroShopPlan,
   fetchKubicEngAdmin, updateKubicUserPlan,
+  fetchPsiAuraAdmin,
   type NeroAdminData, type KubicAdminData, type NeroPlan, type KubicPlan,
+  type PsiAuraAdminData,
 } from '@/lib/supabase/server'
 
 /* ─── Tipos ───────────────────────────────────────────────────── */
@@ -445,6 +447,9 @@ const STATUS_CLS: Record<string, string> = {
   active:    'bg-emerald-900/30 text-emerald-400',
   trial:     'bg-amber-900/30  text-amber-400',
   cancelled: 'bg-red-900/30    text-red-400',
+  canceled:  'bg-red-900/30    text-red-400',
+  canceling: 'bg-orange-900/30 text-orange-400',
+  past_due:  'bg-red-900/30    text-red-400',
   expired:   'bg-red-900/30    text-red-400',
 }
 const ROLE_CLS: Record<string, string> = {
@@ -464,6 +469,7 @@ function AdminSaaS({ productId }: { productId: string }) {
   const [error,     setError]     = useState<string | null>(null)
   const [neroData,  setNeroData]  = useState<NeroAdminData | null>(null)
   const [kubicData, setKubicData] = useState<KubicAdminData | null>(null)
+  const [psiData,   setPsiData]   = useState<PsiAuraAdminData | null>(null)
   const [pending,   setPending]   = useState<Record<string, string>>({})
   const [saving,    setSaving]    = useState<Record<string, boolean>>({})
   const [savedOk,   setSavedOk]   = useState<Record<string, boolean>>({})
@@ -478,6 +484,9 @@ function AdminSaaS({ productId }: { productId: string }) {
       } else if (productId === 'kubic-eng') {
         const r = await fetchKubicEngAdmin()
         if (r.error) setError(r.error); else if (r.data) setKubicData(r.data)
+      } else if (productId === 'psi-aura') {
+        const r = await fetchPsiAuraAdmin()
+        if (r.error) setError(r.error); else if (r.data) setPsiData(r.data)
       }
       setLoaded(true)
     } catch (e: unknown) { setError((e as Error).message) }
@@ -508,7 +517,7 @@ function AdminSaaS({ productId }: { productId: string }) {
     } finally { setSaving(p => { const n = { ...p }; delete n[entityId]; return n }) }
   }
 
-  if (productId !== 'nero-barber' && productId !== 'kubic-eng') return null
+  if (productId !== 'nero-barber' && productId !== 'kubic-eng' && productId !== 'psi-aura') return null
 
   return (
     <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
@@ -693,6 +702,68 @@ function AdminSaaS({ productId }: { productId: string }) {
                       <span className="font-semibold text-gray-200">{pl.name}</span>
                       {pl.price > 0 ? <span className="text-gray-500 ml-2">R${pl.price}/mês · R${pl.price_annual}/ano</span> : <span className="text-gray-500 ml-2">Personalizado</span>}
                       {pl.max_users > 0 && <span className="text-gray-600 ml-2">até {pl.max_users} users</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* PSI AURA DATA */}
+          {psiData && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Clínicas',  val: psiData.totalClinics },
+                  { label: 'Ativas',    val: psiData.activeCount,  cls: 'text-emerald-400' },
+                  { label: 'Atraso',    val: psiData.pastDueCount, cls: 'text-red-400' },
+                  { label: 'MRR',       val: `R$${psiData.mrr.toLocaleString('pt-BR')}`, cls: 'text-violet-400' },
+                ].map(k => (
+                  <div key={k.label} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg p-3 text-center">
+                    <div className={`text-xl font-bold ${k.cls ?? 'text-white'}`}>{k.val}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <p className="text-[11px] text-gray-600 uppercase tracking-wider font-medium mb-2.5">Clínicas</p>
+                <div className="overflow-x-auto rounded-lg border border-[#1e1e2e]">
+                  <table className="w-full text-sm min-w-[800px]">
+                    <thead className="bg-[#0d0d14]">
+                      <tr>{['Clínica', 'Email', 'Plano', 'Status', 'Vencimento', 'Cadastro', 'Users'].map(h => (
+                        <th key={h} className="px-3 py-2.5 text-[10px] text-gray-600 uppercase tracking-wider font-medium text-left first:pl-4 last:pr-4">{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {psiData.clinics.map((clinic, i) => (
+                        <tr key={clinic.id} className={`border-t border-[#1e1e2e] hover:bg-[#0d0d14] transition-colors ${i % 2 ? 'bg-[#0a0a10]' : ''}`}>
+                          <td className="px-4 py-2.5 font-medium text-gray-200 max-w-[160px]"><span className="block truncate" title={clinic.clinicName}>{clinic.clinicName}</span></td>
+                          <td className="px-3 py-2.5 text-xs text-gray-400 max-w-[180px]"><span className="block truncate" title={clinic.email}>{clinic.email}</span></td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <span className="text-xs font-medium text-gray-300">{clinic.planName}</span>
+                            <span className="text-[11px] text-gray-600 ml-1.5">R${clinic.planPrice}</span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_CLS[clinic.subscriptionStatus] ?? 'text-gray-400'}`}>{clinic.subscriptionStatus}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(clinic.subscriptionEndDate)}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(clinic.joinedAt)}</td>
+                          <td className="px-3 pr-4 py-2.5 text-xs text-gray-400 text-center">{clinic.userCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[11px] text-gray-600 uppercase tracking-wider font-medium mb-2">Planos</p>
+                <div className="flex flex-wrap gap-2">
+                  {psiData.plans.map(pl => (
+                    <div key={pl.id} className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg px-3 py-2 text-xs">
+                      <span className="font-semibold text-gray-200">{pl.name}</span>
+                      <span className="text-gray-500 ml-2">R${pl.price}/mês · R${Math.round(pl.yearlyPrice)}/ano</span>
                     </div>
                   ))}
                 </div>
