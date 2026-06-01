@@ -121,7 +121,7 @@ const PRODUTOS: Produto[] = [
     icon: '🧠', nome: 'Psi Aura',
     tagline: 'Gestão clínica de alta performance para psicólogos',
     status: 'Atenção', statusCor: 'bg-amber-900/30 text-amber-400 border border-amber-800/40',
-    pct: 55,
+    pct: 65,
     descCurta: 'SaaS para psicólogos — agenda, prontuários eletrônicos e módulo ABA integrado.',
     descLonga: 'Plataforma clínica focada em Análise do Comportamento Aplicado (ABA) e produtividade do psicólogo. Prontuário eletrônico com assinatura digital, agenda com controle de salas, financeiro por profissional e suporte a clínicas multidisciplinares. v2.1.0 com protocolos ABA completos em produção.',
     personalidade: 'Acolhedor · Científico · Claro. A experiência é serena — azul-marinho e teal transmitem confiança e cuidado sem frieza corporativa.',
