@@ -11,6 +11,7 @@ import {
   type ReceitaInsert,
   PRODUTOS_LISTA,
   FORMAS_RECEBIMENTO,
+  CATEGORIAS_RECEITA,
 } from '@/types/financeiro'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ const ORIGEM_LABEL: Record<string, string> = {
 const formInicial = (): ReceitaInsert => ({
   data: new Date().toISOString().split('T')[0],
   descricao: '',
+  categoria: 'Mensalidade',
   produto: 'Geral',
   cliente: '',
   valor: 0,
@@ -81,6 +83,7 @@ function receitaToForm(r: Receita): ReceitaInsert {
   return {
     data: r.data,
     descricao: r.descricao,
+    categoria: r.categoria,
     produto: r.produto,
     cliente: r.cliente,
     cliente_id: r.cliente_id,
@@ -159,6 +162,12 @@ function ModalReceita({ open, editing, onClose, onSave }: {
               <label className={lbl}>Produto</label>
               <select value={form.produto} onChange={e => set('produto', e.target.value)} className={inp}>
                 {PRODUTOS_LISTA.map(p => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Categoria</label>
+              <select value={form.categoria ?? 'Mensalidade'} onChange={e => set('categoria', e.target.value)} className={inp}>
+                {CATEGORIAS_RECEITA.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
@@ -283,6 +292,7 @@ export default function ReceitasPage() {
   const [produtoF, setProdutoF]   = useState('Todos')
   const [origemF, setOrigemF]     = useState('Todos')
   const [statusF, setStatusF]     = useState('Todos')
+  const [catF, setCatF]           = useState('Todas')
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
 
   const fetchReceitas = useCallback(async () => {
@@ -385,7 +395,8 @@ export default function ReceitasPage() {
     const matchProduto = produtoF === 'Todos' || r.produto === produtoF
     const matchOrigem  = origemF  === 'Todos' || r.origem  === origemF
     const matchStatus  = statusF  === 'Todos' || r.status  === statusF
-    return matchBusca && matchProduto && matchOrigem && matchStatus
+    const matchCat     = catF     === 'Todas' || (r.categoria ?? 'Mensalidade') === catF
+    return matchBusca && matchProduto && matchOrigem && matchStatus && matchCat
   })
 
   // Seleção múltipla
@@ -470,6 +481,10 @@ export default function ReceitasPage() {
             <option value="Todos">Todos os produtos</option>
             {PRODUTOS_LISTA.map(p => <option key={p}>{p}</option>)}
           </select>
+          <select value={catF} onChange={e => setCatF(e.target.value)} className={sel}>
+            <option value="Todas">Todas as categorias</option>
+            {CATEGORIAS_RECEITA.map(c => <option key={c}>{c}</option>)}
+          </select>
           <select value={origemF} onChange={e => setOrigemF(e.target.value)} className={sel}>
             <option value="Todos">Todas as origens</option>
             <option value="asaas">Asaas</option>
@@ -482,8 +497,8 @@ export default function ReceitasPage() {
             <option value="estornado">Estornado</option>
             <option value="cancelado">Cancelado</option>
           </select>
-          {(busca || produtoF !== 'Todos' || origemF !== 'Todos' || statusF !== 'Todos') && (
-            <button onClick={() => { setBusca(''); setProdutoF('Todos'); setOrigemF('Todos'); setStatusF('Todos') }}
+          {(busca || produtoF !== 'Todos' || origemF !== 'Todos' || statusF !== 'Todos' || catF !== 'Todas') && (
+            <button onClick={() => { setBusca(''); setProdutoF('Todos'); setOrigemF('Todos'); setStatusF('Todos'); setCatF('Todas') }}
               className="text-xs text-gray-500 hover:text-white transition-colors">Limpar</button>
           )}
           <div className="sm:ml-auto text-sm text-gray-500">
@@ -546,6 +561,7 @@ export default function ReceitasPage() {
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtData(r.data)}</td>
                       <td className="px-4 py-3 text-white font-medium max-w-[260px]">
                         <span className="truncate block">{r.descricao || '—'}</span>
+                        {r.categoria && <span className="text-[11px] text-gray-600">{r.categoria}</span>}
                         {r.recorrente && (
                           <span className="text-violet-400 text-[11px] flex items-center gap-1 mt-0.5">
                             ↺ {r.periodicidade}

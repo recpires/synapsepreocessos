@@ -31,6 +31,7 @@ export type Receita = {
   id: string
   data: string
   descricao: string
+  categoria?: string
   produto: string
   cliente?: string
   cliente_id?: string
@@ -64,6 +65,15 @@ export const FORMAS_RECEBIMENTO = [
 ] as const
 
 export const TIPOS_RECEITA = ['recorrente', 'pontual', 'setup'] as const
+
+export const CATEGORIAS_RECEITA = [
+  'Mensalidade',
+  'Setup',
+  'Projeto',
+  'Consultoria',
+  'Licença',
+  'Outros',
+] as const
 
 export const STATUS_RECEITA = ['recebido', 'confirmado', 'estornado', 'cancelado'] as const
 

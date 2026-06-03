@@ -846,7 +846,7 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
 
 // ─── Projeção de Fluxo de Caixa ───────────────────────────────────────────────
 
-function ProjecaoView({ despesas, receitas }: { despesas: Despesa[]; receitas: Receita[] }) {
+function ProjecaoView({ despesas, receitas, ultimaRenovacao }: { despesas: Despesa[]; receitas: Receita[]; ultimaRenovacao?: string | null }) {
   const [saldoInicial, setSaldoInicial] = useState(0)
 
   // Janela: mês atual + 11 meses à frente
@@ -963,10 +963,17 @@ function ProjecaoView({ despesas, receitas }: { despesas: Despesa[]; receitas: R
         </div>
       </div>
 
-      <p className="text-xs text-gray-600">
-        💡 Projeção baseada nos lançamentos já registrados (incluindo despesas fixas e parcelas futuras).
-        Cadastre receitas recorrentes para enriquecer as entradas previstas.
-      </p>
+      <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-gray-600">
+        <p>
+          💡 Projeção baseada nos lançamentos já registrados (incluindo despesas fixas e parcelas futuras).
+          Cadastre receitas recorrentes para enriquecer as entradas previstas.
+        </p>
+        {ultimaRenovacao && (
+          <span className="text-gray-700 whitespace-nowrap">
+            🔄 renovação automática: {new Date(ultimaRenovacao).toLocaleDateString('pt-BR')}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -978,6 +985,7 @@ export default function FinanceiroPage() {
 
   const [despesas, setDespesas]   = useState<Despesa[]>([])
   const [receitas, setReceitas]   = useState<Receita[]>([])
+  const [ultimaRenovacao, setUltimaRenovacao] = useState<string | null>(null)
   const [loading, setLoading]     = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<Despesa | null>(null)
@@ -987,12 +995,14 @@ export default function FinanceiroPage() {
 
   const fetchDespesas = useCallback(async () => {
     setLoading(true)
-    const [{ data: desp }, { data: rec }] = await Promise.all([
+    const [{ data: desp }, { data: rec }, { data: log }] = await Promise.all([
       supabase.from('despesas').select('*').order('data', { ascending: false }),
       supabase.from('receitas').select('*').order('data', { ascending: false }),
+      supabase.from('cron_log').select('executado_em').order('executado_em', { ascending: false }).limit(1),
     ])
     setDespesas(desp ?? [])
     setReceitas((rec as Receita[]) ?? [])
+    setUltimaRenovacao(log?.[0]?.executado_em ?? null)
     setLoading(false)
   }, [supabase])
 
@@ -1216,7 +1226,7 @@ export default function FinanceiroPage() {
         ) : aba === 'dashboard' ? (
           <DashboardView despesas={despesasDashboard} periodo={mesGlobal} />
         ) : aba === 'projecao' ? (
-          <ProjecaoView despesas={despesas} receitas={receitas} />
+          <ProjecaoView despesas={despesas} receitas={receitas} ultimaRenovacao={ultimaRenovacao} />
         ) : (
           <DespesasView despesas={despesas} onDelete={handleDelete} onDeleteMany={handleDeleteMany} onEdit={openEditar} onDuplicate={openDuplicar} onVerAnexo={verAnexo} onAdd={openNova} />
         )}
