@@ -9,6 +9,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar } from '@/components/Feedback'
+import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Despesa,
@@ -101,6 +102,15 @@ function ChartTooltip({ active, payload, label }: {
 // ─── Modal Nova Despesa ───────────────────────────────────────────────────────
 
 const PERIODICIDADES = ['Mensal', 'Quinzenal', 'Semanal', 'Anual'] as const
+
+type FiltrosDespesa = {
+  preset: PeriodoPreset; de: string; ate: string
+  categoria: string; tipo: string; produto: string; busca: string
+}
+const FILTRO_DESPESA_INICIAL: FiltrosDespesa = {
+  preset: 'ano-atual', de: '', ate: '',
+  categoria: 'Todas', tipo: 'todos', produto: 'Todos', busca: '',
+}
 
 const EMPTY_FORM: DespesaInsert = {
   data: new Date().toISOString().split('T')[0],
@@ -643,31 +653,25 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
   onEdit: (d: Despesa) => void; onDuplicate: (d: Despesa) => void
   onVerAnexo: (path: string) => void; onAdd: () => void
 }) {
-  const anoCorrente = String(new Date().getFullYear())
-  const [anoFiltro, setAnoFiltro]   = useState(anoCorrente)
-  const [mesFiltro, setMesFiltro]   = useState('todos')
-  const [catFiltro, setCatFiltro]   = useState('Todas')
-  const [tipoFiltro, setTipoFiltro] = useState('todos')
-  const [busca, setBusca]           = useState('')
+  const [f, setF] = usePersistido<FiltrosDespesa>('financeiro:filtros-despesas', FILTRO_DESPESA_INICIAL)
+  const upd = (patch: Partial<FiltrosDespesa>) => setF({ ...f, ...patch })
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
 
-  const anosDisponiveis = Array.from(new Set(despesas.map(d => d.data.slice(0, 4)))).sort().reverse()
+  const { de, ate } = rangePeriodo(f.preset, f.de, f.ate)
 
   const filtradas = despesas.filter(d => {
-    const matchAno   = anoFiltro === 'todos'  || d.data.startsWith(anoFiltro)
-    const matchMes   = mesFiltro === 'todos'  || d.data.startsWith(mesFiltro)
-    const matchCat   = catFiltro === 'Todas'  || d.categoria === catFiltro
-    const matchTipo  = tipoFiltro === 'todos' || d.tipo === tipoFiltro
-    const matchBusca = !busca ||
-      d.descricao.toLowerCase().includes(busca.toLowerCase()) ||
-      d.produto.toLowerCase().includes(busca.toLowerCase())
-    return matchAno && matchMes && matchCat && matchTipo && matchBusca
+    const matchPeriodo = d.data >= de && d.data <= ate
+    const matchCat     = f.categoria === 'Todas' || d.categoria === f.categoria
+    const matchTipo    = f.tipo === 'todos'      || d.tipo === f.tipo
+    const matchProduto = f.produto === 'Todos'   || d.produto === f.produto
+    const matchBusca   = !f.busca ||
+      d.descricao.toLowerCase().includes(f.busca.toLowerCase()) ||
+      d.produto.toLowerCase().includes(f.busca.toLowerCase())
+    return matchPeriodo && matchCat && matchTipo && matchProduto && matchBusca
   })
 
   const totalFiltrado = filtradas.reduce((s, d) => s + Number(d.valor), 0)
-  const mesesDisponiveis = Array.from(new Set(
-    despesas.filter(d => anoFiltro === 'todos' || d.data.startsWith(anoFiltro)).map(d => d.data.slice(0, 7))
-  )).sort().reverse()
+  const filtroAtivo = f.preset !== 'ano-atual' || f.categoria !== 'Todas' || f.tipo !== 'todos' || f.produto !== 'Todos' || !!f.busca
 
   const toggleUm = (id: string) => setSelecionados(prev => {
     const next = new Set(prev)
@@ -694,31 +698,38 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-center">
-        <select value={anoFiltro} onChange={e => { setAnoFiltro(e.target.value); setMesFiltro('todos') }} className={sel}>
-          <option value="todos">Todos os anos</option>
-          {anosDisponiveis.map(a => <option key={a} value={a}>{a}</option>)}
+        <select value={f.preset} onChange={e => upd({ preset: e.target.value as PeriodoPreset })} className={sel}>
+          {(Object.keys(PERIODO_LABEL) as PeriodoPreset[]).map(p => (
+            <option key={p} value={p}>{PERIODO_LABEL[p]}</option>
+          ))}
         </select>
-        <select value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} className={sel}>
-          <option value="todos">Todos os meses</option>
-          {mesesDisponiveis.map(m => {
-            const [ano, mes] = m.split('-')
-            return <option key={m} value={m}>{MESES_FULL[parseInt(mes) - 1]} {ano}</option>
-          })}
+        {f.preset === 'custom' && (
+          <>
+            <input type="date" value={f.de} onChange={e => upd({ de: e.target.value })}
+              title="Data início" className={sel} />
+            <span className="text-gray-600 text-sm">até</span>
+            <input type="date" value={f.ate} onChange={e => upd({ ate: e.target.value })}
+              title="Data fim" className={sel} />
+          </>
+        )}
+        <select value={f.produto} onChange={e => upd({ produto: e.target.value })} className={sel}>
+          <option value="Todos">Todos os serviços</option>
+          {PRODUTOS_LISTA.map(p => <option key={p}>{p}</option>)}
         </select>
-        <select value={catFiltro} onChange={e => setCatFiltro(e.target.value)} className={sel}>
+        <select value={f.categoria} onChange={e => upd({ categoria: e.target.value })} className={sel}>
           <option value="Todas">Todas as categorias</option>
           {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
         </select>
-        <select value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value)} className={sel}>
+        <select value={f.tipo} onChange={e => upd({ tipo: e.target.value })} className={sel}>
           <option value="todos">Todos os tipos</option>
           <option value="fixo">Fixo</option>
           <option value="variavel">Variável</option>
           <option value="pontual">Pontual</option>
         </select>
-        <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar…" className={`${sel} w-44 placeholder-gray-600`} />
-        {(anoFiltro !== 'todos' || mesFiltro !== 'todos' || catFiltro !== 'Todas' || tipoFiltro !== 'todos' || busca) && (
-          <button onClick={() => { setAnoFiltro('todos'); setMesFiltro('todos'); setCatFiltro('Todas'); setTipoFiltro('todos'); setBusca('') }}
+        <input type="text" value={f.busca} onChange={e => upd({ busca: e.target.value })}
+          placeholder="Buscar…" className={`${sel} w-40 placeholder-gray-600`} />
+        {filtroAtivo && (
+          <button onClick={() => setF(FILTRO_DESPESA_INICIAL)}
             className="text-xs text-gray-500 hover:text-white transition-colors">Limpar</button>
         )}
         <div className="ml-auto flex items-center gap-3">
@@ -991,7 +1002,7 @@ export default function FinanceiroPage() {
   const [editing, setEditing]     = useState<Despesa | null>(null)
   const [duplicando, setDuplicando] = useState<Despesa | null>(null)
   const [aba, setAba]             = useState<'dashboard' | 'despesas' | 'projecao'>('dashboard')
-  const [mesGlobal, setMesGlobal] = useState('geral')
+  const [mesGlobal, setMesGlobal] = usePersistido<string>('financeiro:dashboard-mes', 'geral')
 
   const fetchDespesas = useCallback(async () => {
     setLoading(true)
@@ -1162,29 +1173,14 @@ export default function FinanceiroPage() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Filtro de mês global — só aparece no dashboard */}
             {aba === 'dashboard' && (
-              <div className="flex items-center gap-1 bg-[#111118] border border-[#1e1e2e] rounded-xl p-1">
-                <button
-                  onClick={() => setMesGlobal('geral')}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                    mesGlobal === 'geral' ? 'bg-violet-600 text-white font-medium' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Geral
-                </button>
+              <select value={mesGlobal} onChange={e => setMesGlobal(e.target.value)}
+                className="bg-[#111118] border border-[#2d2d3d] text-sm text-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-600 transition-colors">
+                <option value="geral">📊 Visão geral</option>
                 {mesesDisponiveis.map(m => {
-                  const [, mes] = m.split('-')
-                  return (
-                    <button key={m}
-                      onClick={() => setMesGlobal(m)}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        mesGlobal === m ? 'bg-violet-600 text-white font-medium' : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {MESES_LABEL[parseInt(mes) - 1]}
-                    </button>
-                  )
+                  const [ano, mes] = m.split('-')
+                  return <option key={m} value={m}>{MESES_FULL[parseInt(mes) - 1]} {ano}</option>
                 })}
-              </div>
+              </select>
             )}
 
             {/* Abas */}
