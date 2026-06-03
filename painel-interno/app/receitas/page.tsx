@@ -5,6 +5,7 @@ import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar } from '@/components/Feedback'
+import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Receita,
@@ -23,6 +24,15 @@ const fmtData = (d?: string) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
 
 const PERIODICIDADES = ['Mensal', 'Quinzenal', 'Semanal', 'Anual'] as const
+
+type FiltrosReceita = {
+  preset: PeriodoPreset; de: string; ate: string
+  busca: string; produto: string; origem: string; status: string; categoria: string
+}
+const FILTRO_RECEITA_INICIAL: FiltrosReceita = {
+  preset: 'ano-atual', de: '', ate: '',
+  busca: '', produto: 'Todos', origem: 'Todos', status: 'Todos', categoria: 'Todas',
+}
 
 function addPeriodo(dataISO: string, periodicidade: string, n: number): string {
   const [y, m, d] = dataISO.split('-').map(Number)
@@ -288,11 +298,8 @@ export default function ReceitasPage() {
   const [loading, setLoading]     = useState(true)
   const [modal, setModal]         = useState(false)
   const [editing, setEditing]     = useState<Receita | null>(null)
-  const [busca, setBusca]         = useState('')
-  const [produtoF, setProdutoF]   = useState('Todos')
-  const [origemF, setOrigemF]     = useState('Todos')
-  const [statusF, setStatusF]     = useState('Todos')
-  const [catF, setCatF]           = useState('Todas')
+  const [f, setF] = usePersistido<FiltrosReceita>('financeiro:filtros-receitas', FILTRO_RECEITA_INICIAL)
+  const upd = (patch: Partial<FiltrosReceita>) => setF({ ...f, ...patch })
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
 
   const fetchReceitas = useCallback(async () => {
@@ -389,15 +396,18 @@ export default function ReceitasPage() {
   }
 
   // Filtros
+  const { de, ate } = rangePeriodo(f.preset, f.de, f.ate)
   const filtradas = receitas.filter(r => {
-    const matchBusca   = !busca || (r.descricao ?? '').toLowerCase().includes(busca.toLowerCase()) ||
-                                   (r.cliente   ?? '').toLowerCase().includes(busca.toLowerCase())
-    const matchProduto = produtoF === 'Todos' || r.produto === produtoF
-    const matchOrigem  = origemF  === 'Todos' || r.origem  === origemF
-    const matchStatus  = statusF  === 'Todos' || r.status  === statusF
-    const matchCat     = catF     === 'Todas' || (r.categoria ?? 'Mensalidade') === catF
-    return matchBusca && matchProduto && matchOrigem && matchStatus && matchCat
+    const matchPeriodo = r.data >= de && r.data <= ate
+    const matchBusca   = !f.busca || (r.descricao ?? '').toLowerCase().includes(f.busca.toLowerCase()) ||
+                                     (r.cliente   ?? '').toLowerCase().includes(f.busca.toLowerCase())
+    const matchProduto = f.produto === 'Todos' || r.produto === f.produto
+    const matchOrigem  = f.origem  === 'Todos' || r.origem  === f.origem
+    const matchStatus  = f.status  === 'Todos' || r.status  === f.status
+    const matchCat     = f.categoria === 'Todas' || (r.categoria ?? 'Mensalidade') === f.categoria
+    return matchPeriodo && matchBusca && matchProduto && matchOrigem && matchStatus && matchCat
   })
+  const filtroAtivo = f.preset !== 'ano-atual' || f.busca || f.produto !== 'Todos' || f.origem !== 'Todos' || f.status !== 'Todos' || f.categoria !== 'Todas'
 
   // Seleção múltipla
   const toggleUm = (id: string) => setSelecionados(prev => {
@@ -474,31 +484,43 @@ export default function ReceitasPage() {
 
         {/* Filtros */}
         <div className="flex flex-wrap gap-3 items-center">
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+          <select value={f.preset} onChange={e => upd({ preset: e.target.value as PeriodoPreset })} className={sel}>
+            {(Object.keys(PERIODO_LABEL) as PeriodoPreset[]).map(p => (
+              <option key={p} value={p}>{PERIODO_LABEL[p]}</option>
+            ))}
+          </select>
+          {f.preset === 'custom' && (
+            <>
+              <input type="date" value={f.de} onChange={e => upd({ de: e.target.value })} title="Início" className={sel} />
+              <span className="text-gray-600 text-sm">até</span>
+              <input type="date" value={f.ate} onChange={e => upd({ ate: e.target.value })} title="Fim" className={sel} />
+            </>
+          )}
+          <input type="text" value={f.busca} onChange={e => upd({ busca: e.target.value })}
             placeholder="Buscar descrição ou cliente…"
-            className={`${sel} w-full sm:w-56 placeholder-gray-600`} />
-          <select value={produtoF} onChange={e => setProdutoF(e.target.value)} className={sel}>
-            <option value="Todos">Todos os produtos</option>
+            className={`${sel} w-full sm:w-48 placeholder-gray-600`} />
+          <select value={f.produto} onChange={e => upd({ produto: e.target.value })} className={sel}>
+            <option value="Todos">Todos os serviços</option>
             {PRODUTOS_LISTA.map(p => <option key={p}>{p}</option>)}
           </select>
-          <select value={catF} onChange={e => setCatF(e.target.value)} className={sel}>
+          <select value={f.categoria} onChange={e => upd({ categoria: e.target.value })} className={sel}>
             <option value="Todas">Todas as categorias</option>
             {CATEGORIAS_RECEITA.map(c => <option key={c}>{c}</option>)}
           </select>
-          <select value={origemF} onChange={e => setOrigemF(e.target.value)} className={sel}>
+          <select value={f.origem} onChange={e => upd({ origem: e.target.value })} className={sel}>
             <option value="Todos">Todas as origens</option>
             <option value="asaas">Asaas</option>
             <option value="manual">Manual</option>
           </select>
-          <select value={statusF} onChange={e => setStatusF(e.target.value)} className={sel}>
+          <select value={f.status} onChange={e => upd({ status: e.target.value })} className={sel}>
             <option value="Todos">Todos os status</option>
             <option value="recebido">Recebido</option>
             <option value="confirmado">Confirmado</option>
             <option value="estornado">Estornado</option>
             <option value="cancelado">Cancelado</option>
           </select>
-          {(busca || produtoF !== 'Todos' || origemF !== 'Todos' || statusF !== 'Todos' || catF !== 'Todas') && (
-            <button onClick={() => { setBusca(''); setProdutoF('Todos'); setOrigemF('Todos'); setStatusF('Todos'); setCatF('Todas') }}
+          {filtroAtivo && (
+            <button onClick={() => setF(FILTRO_RECEITA_INICIAL)}
               className="text-xs text-gray-500 hover:text-white transition-colors">Limpar</button>
           )}
           <div className="sm:ml-auto text-sm text-gray-500">
