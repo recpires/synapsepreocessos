@@ -1138,15 +1138,17 @@ export default function FinanceiroPage() {
     fetchDespesas()
   }
 
-  // Meses disponíveis para o filtro global
-  const mesesDisponiveis = Array.from(new Set(despesas.map(d => d.data.slice(0, 7)))).sort().reverse()
+  // Dashboard considera só o REALIZADO (até hoje) — o futuro fica na aba Projeção
+  const hojeISO = new Date().toISOString().slice(0, 10)
+  const despesasRealizadas = despesas.filter(d => d.data <= hojeISO)
 
-  // Despesas filtradas pelo mês global (usado só no Dashboard)
+  // Meses disponíveis para o filtro global (só meses já realizados)
+  const mesesDisponiveis = Array.from(new Set(despesasRealizadas.map(d => d.data.slice(0, 7)))).sort().reverse()
   const despesasDashboard = mesGlobal === 'geral'
-    ? despesas
-    : despesas.filter(d => d.data.startsWith(mesGlobal))
+    ? despesasRealizadas
+    : despesasRealizadas.filter(d => d.data.startsWith(mesGlobal))
 
-  const totalGeral = despesas.reduce((s, d) => s + Number(d.valor), 0)
+  const totalGeral = despesasRealizadas.reduce((s, d) => s + Number(d.valor), 0)
 
   // Alertas de vencimento — despesas a vencer nos próximos 7 dias
   const hojeStr = new Date().toISOString().slice(0, 10)
@@ -1166,7 +1168,7 @@ export default function FinanceiroPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Controle Financeiro</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              {despesas.length} registros · {fmt(totalGeral)} total acumulado
+              {despesasRealizadas.length} lançamentos realizados · {fmt(totalGeral)} já gasto
             </p>
           </div>
 
