@@ -96,14 +96,42 @@ const EMPTY_FORM: DespesaInsert = {
   created_by: 'painel',
 }
 
-function ModalDespesa({ open, onClose, onSave }: {
-  open: boolean; onClose: () => void; onSave: (d: DespesaInsert, file?: File) => Promise<void>
+function despesaToForm(d: Despesa): DespesaInsert {
+  return {
+    data: d.data,
+    descricao: d.descricao,
+    categoria: d.categoria,
+    produto: d.produto,
+    forma_pagamento: d.forma_pagamento,
+    condicao: d.condicao,
+    valor: d.valor,
+    tipo: d.tipo,
+    recorrente: d.recorrente,
+    periodicidade: d.periodicidade,
+    proxima_data: d.proxima_data,
+    observacao: d.observacao,
+    anexo_url: d.anexo_url,
+    anexo_nome: d.anexo_nome,
+    created_by: d.created_by,
+  }
+}
+
+function ModalDespesa({ open, editing, onClose, onSave }: {
+  open: boolean
+  editing: Despesa | null
+  onClose: () => void
+  onSave: (d: DespesaInsert, file: File | undefined, id?: string) => Promise<void>
 }) {
   const [form, setForm] = useState<DespesaInsert>(EMPTY_FORM)
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { if (open) { setForm(EMPTY_FORM); setArquivo(null) } }, [open])
+  useEffect(() => {
+    if (open) {
+      setForm(editing ? despesaToForm(editing) : EMPTY_FORM)
+      setArquivo(null)
+    }
+  }, [open, editing])
   if (!open) return null
 
   const set = (k: keyof DespesaInsert, v: unknown) => setForm(f => ({ ...f, [k]: v }))
@@ -111,7 +139,7 @@ function ModalDespesa({ open, onClose, onSave }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await onSave(form, arquivo ?? undefined)
+    await onSave(form, arquivo ?? undefined, editing?.id)
     setSaving(false)
   }
 
@@ -126,7 +154,7 @@ function ModalDespesa({ open, onClose, onSave }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-[#1e1e2e]">
-          <h2 className="font-semibold text-white">Nova Despesa</h2>
+          <h2 className="font-semibold text-white">{editing ? 'Editar Despesa' : 'Nova Despesa'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -225,6 +253,14 @@ function ModalDespesa({ open, onClose, onSave }: {
                     onClick={e => { e.preventDefault(); setArquivo(null) }}
                     className="text-gray-500 hover:text-red-400 transition-colors text-lg leading-none flex-shrink-0"
                   >×</button>
+                </div>
+              ) : form.anexo_url ? (
+                <div className="flex items-center gap-3 w-full">
+                  <span className="text-lg">{form.anexo_nome?.endsWith('.pdf') ? '📄' : '🖼️'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-violet-300 truncate">{form.anexo_nome ?? 'Anexo atual'}</p>
+                    <p className="text-xs text-gray-500">Clique para substituir</p>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-3 text-gray-500">
@@ -472,8 +508,8 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
 
 // ─── Despesas View ────────────────────────────────────────────────────────────
 
-function DespesasView({ despesas, onDelete, onAdd }: {
-  despesas: Despesa[]; onDelete: (id: string) => void; onAdd: () => void
+function DespesasView({ despesas, onDelete, onEdit, onAdd }: {
+  despesas: Despesa[]; onDelete: (id: string) => void; onEdit: (d: Despesa) => void; onAdd: () => void
 }) {
   const [mesFiltro, setMesFiltro]   = useState('todos')
   const [catFiltro, setCatFiltro]   = useState('Todas')
@@ -587,9 +623,13 @@ function DespesasView({ despesas, onDelete, onAdd }: {
                         <span className="text-gray-700">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => onDelete(d.id)}
-                        className="text-gray-600 hover:text-red-400 transition-colors text-base">×</button>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => onEdit(d)} title="Editar"
+                          className="text-gray-600 hover:text-violet-400 transition-colors text-sm">✎</button>
+                        <button onClick={() => onDelete(d.id)} title="Excluir"
+                          className="text-gray-600 hover:text-red-400 transition-colors text-base leading-none">×</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -610,6 +650,7 @@ export default function FinanceiroPage() {
   const [despesas, setDespesas]   = useState<Despesa[]>([])
   const [loading, setLoading]     = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing]     = useState<Despesa | null>(null)
   const [aba, setAba]             = useState<'dashboard' | 'despesas'>('dashboard')
   const [mesGlobal, setMesGlobal] = useState('geral')
 
@@ -624,9 +665,23 @@ export default function FinanceiroPage() {
     fetchDespesas()
   }, [fetchDespesas])
 
-  async function handleSave(d: DespesaInsert, file?: File) {
-    let anexo_url: string | undefined
-    let anexo_nome: string | undefined
+  function openNova() {
+    setEditing(null)
+    setModalOpen(true)
+  }
+
+  function openEditar(d: Despesa) {
+    setEditing(d)
+    setModalOpen(true)
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+    setEditing(null)
+  }
+
+  async function handleSave(d: DespesaInsert, file: File | undefined, id?: string) {
+    const payload = { ...d }
 
     if (file) {
       const ext = file.name.split('.').pop()
@@ -638,13 +693,17 @@ export default function FinanceiroPage() {
         const { data: urlData } = supabase.storage
           .from('financeiro-anexos')
           .getPublicUrl(uploadData.path)
-        anexo_url = urlData.publicUrl
-        anexo_nome = file.name
+        payload.anexo_url = urlData.publicUrl
+        payload.anexo_nome = file.name
       }
     }
 
-    await supabase.from('despesas').insert({ ...d, anexo_url, anexo_nome })
-    setModalOpen(false)
+    if (id) {
+      await supabase.from('despesas').update(payload).eq('id', id)
+    } else {
+      await supabase.from('despesas').insert(payload)
+    }
+    closeModal()
     fetchDespesas()
   }
 
@@ -725,11 +784,11 @@ export default function FinanceiroPage() {
         ) : aba === 'dashboard' ? (
           <DashboardView despesas={despesasDashboard} periodo={mesGlobal} />
         ) : (
-          <DespesasView despesas={despesas} onDelete={handleDelete} onAdd={() => setModalOpen(true)} />
+          <DespesasView despesas={despesas} onDelete={handleDelete} onEdit={openEditar} onAdd={openNova} />
         )}
       </div>
 
-      <ModalDespesa open={modalOpen} onClose={() => setModalOpen(false)} onSave={handleSave} />
+      <ModalDespesa open={modalOpen} editing={editing} onClose={closeModal} onSave={handleSave} />
     </PainelShell>
   )
 }

@@ -55,23 +55,47 @@ const formInicial = (): ReceitaInsert => ({
 
 // ─── Modal: Nova Receita ──────────────────────────────────────────────────────
 
-function ModalReceita({ open, onClose, onSave }: {
+function receitaToForm(r: Receita): ReceitaInsert {
+  return {
+    data: r.data,
+    descricao: r.descricao,
+    produto: r.produto,
+    cliente: r.cliente,
+    cliente_id: r.cliente_id,
+    valor: r.valor,
+    tipo: r.tipo,
+    forma_pagamento: r.forma_pagamento,
+    status: r.status,
+    origem: r.origem,
+    origem_id: r.origem_id,
+    observacao: r.observacao,
+    payload_raw: r.payload_raw,
+    created_by: r.created_by,
+  }
+}
+
+function ModalReceita({ open, editing, onClose, onSave }: {
   open: boolean
+  editing: Receita | null
   onClose: () => void
-  onSave: (r: ReceitaInsert) => Promise<void>
+  onSave: (r: ReceitaInsert, id?: string) => Promise<void>
 }) {
   const [form, setForm]   = useState<ReceitaInsert>(formInicial())
   const [saving, setSave] = useState(false)
 
-  useEffect(() => { if (open) setForm(formInicial()) }, [open])
+  useEffect(() => {
+    if (open) setForm(editing ? receitaToForm(editing) : formInicial())
+  }, [open, editing])
   if (!open) return null
 
   const set = (k: keyof ReceitaInsert, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setSave(true)
-    await onSave(form); setSave(false)
+    await onSave(form, editing?.id); setSave(false)
   }
+
+  const isAsaas = editing?.origem === 'asaas'
 
   const inp = `w-full bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg px-3 py-2 text-white text-sm
     focus:outline-none focus:border-violet-600 transition-colors`
@@ -81,10 +105,15 @@ function ModalReceita({ open, onClose, onSave }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-[#1e1e2e]">
-          <h2 className="font-semibold text-white">Nova Receita (Manual)</h2>
+          <h2 className="font-semibold text-white">{editing ? 'Editar Receita' : 'Nova Receita (Manual)'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {isAsaas && (
+            <div className="bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2 text-xs text-amber-300">
+              ⚠️ Receita originada do Asaas. Editar manualmente não altera a cobrança no gateway.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className={lbl}>Descrição</label>
@@ -147,7 +176,7 @@ function ModalReceita({ open, onClose, onSave }: {
             </button>
             <button type="submit" disabled={saving}
               className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
-              {saving ? 'Salvando…' : 'Salvar Receita'}
+              {saving ? 'Salvando…' : editing ? 'Salvar Alterações' : 'Salvar Receita'}
             </button>
           </div>
         </form>
@@ -164,6 +193,7 @@ export default function ReceitasPage() {
   const [receitas, setReceitas]   = useState<Receita[]>([])
   const [loading, setLoading]     = useState(true)
   const [modal, setModal]         = useState(false)
+  const [editing, setEditing]     = useState<Receita | null>(null)
   const [busca, setBusca]         = useState('')
   const [produtoF, setProdutoF]   = useState('Todos')
   const [origemF, setOrigemF]     = useState('Todos')
@@ -183,14 +213,31 @@ export default function ReceitasPage() {
 
   useEffect(() => { fetchReceitas() }, [fetchReceitas])
 
-  async function handleSave(r: ReceitaInsert) {
-    const { error } = await supabase.from('receitas').insert(r)
+  function openNova() {
+    setEditing(null)
+    setModal(true)
+  }
+
+  function openEditar(r: Receita) {
+    setEditing(r)
+    setModal(true)
+  }
+
+  function closeModal() {
+    setModal(false)
+    setEditing(null)
+  }
+
+  async function handleSave(r: ReceitaInsert, id?: string) {
+    const { error } = id
+      ? await supabase.from('receitas').update(r).eq('id', id)
+      : await supabase.from('receitas').insert(r)
     if (error) {
-      console.error('[receitas] insert:', error)
+      console.error('[receitas] save:', error)
       alert(`Erro ao salvar: ${error.message}`)
       return
     }
-    setModal(false); fetchReceitas()
+    closeModal(); fetchReceitas()
   }
 
   async function handleDelete(id: string) {
@@ -241,7 +288,7 @@ export default function ReceitasPage() {
               Recebimentos automáticos via Asaas + lançamentos manuais avulsos.
             </p>
           </div>
-          <button onClick={() => setModal(true)}
+          <button onClick={openNova}
             className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             + Nova Receita
           </button>
@@ -338,8 +385,13 @@ export default function ReceitasPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="text-[10px] text-gray-500">{ORIGEM_LABEL[r.origem] ?? r.origem}</span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={() => handleDelete(r.id)} className="text-gray-600 hover:text-red-400 transition-colors text-base">×</button>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openEditar(r)} title="Editar"
+                            className="text-gray-600 hover:text-violet-400 transition-colors text-sm">✎</button>
+                          <button onClick={() => handleDelete(r.id)} title="Excluir"
+                            className="text-gray-600 hover:text-red-400 transition-colors text-base leading-none">×</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -350,7 +402,7 @@ export default function ReceitasPage() {
         </div>
       </div>
 
-      <ModalReceita open={modal} onClose={() => setModal(false)} onSave={handleSave} />
+      <ModalReceita open={modal} editing={editing} onClose={closeModal} onSave={handleSave} />
     </PainelShell>
   )
 }
