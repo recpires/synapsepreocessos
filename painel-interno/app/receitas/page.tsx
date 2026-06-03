@@ -20,6 +20,25 @@ const fmt = (v: number) =>
 const fmtData = (d?: string) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
 
+const PERIODICIDADES = ['Mensal', 'Quinzenal', 'Semanal', 'Anual'] as const
+
+function addPeriodo(dataISO: string, periodicidade: string, n: number): string {
+  const [y, m, d] = dataISO.split('-').map(Number)
+  if (periodicidade === 'Semanal' || periodicidade === 'Quinzenal') {
+    const dias = (periodicidade === 'Semanal' ? 7 : 15) * n
+    const dt = new Date(Date.UTC(y, m - 1, d))
+    dt.setUTCDate(dt.getUTCDate() + dias)
+    return dt.toISOString().slice(0, 10)
+  }
+  const passoMeses = periodicidade === 'Anual' ? 12 : 1
+  const totalMeses = (m - 1) + passoMeses * n
+  const novoAno = y + Math.floor(totalMeses / 12)
+  const novoMes = totalMeses % 12
+  const ultimoDia = new Date(Date.UTC(novoAno, novoMes + 1, 0)).getUTCDate()
+  const dia = Math.min(d, ultimoDia)
+  return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+
 const STATUS_CORES: Record<string, string> = {
   recebido:   'bg-emerald-900/40 text-emerald-300 border border-emerald-800',
   confirmado: 'bg-emerald-900/40 text-emerald-300 border border-emerald-800',
@@ -50,6 +69,8 @@ const formInicial = (): ReceitaInsert => ({
   status: 'recebido',
   origem: 'manual',
   observacao: '',
+  recorrente: false,
+  periodicidade: undefined,
   created_by: 'painel',
 })
 
@@ -70,6 +91,8 @@ function receitaToForm(r: Receita): ReceitaInsert {
     origem_id: r.origem_id,
     observacao: r.observacao,
     payload_raw: r.payload_raw,
+    recorrente: r.recorrente,
+    periodicidade: r.periodicidade,
     created_by: r.created_by,
   }
 }
@@ -82,9 +105,15 @@ function ModalReceita({ open, editing, onClose, onSave }: {
 }) {
   const [form, setForm]   = useState<ReceitaInsert>(formInicial())
   const [saving, setSave] = useState(false)
+  const [parcelaModo, setParcelaModo] = useState<'continuo' | 'parcelado'>('continuo')
+  const [parcelaQtd, setParcelaQtd]   = useState(12)
 
   useEffect(() => {
-    if (open) setForm(editing ? receitaToForm(editing) : formInicial())
+    if (open) {
+      setForm(editing ? receitaToForm(editing) : formInicial())
+      setParcelaModo(editing?.parcela_total ? 'parcelado' : 'continuo')
+      setParcelaQtd(editing?.parcela_total ?? 12)
+    }
   }, [open, editing])
   if (!open) return null
 
@@ -92,10 +121,15 @@ function ModalReceita({ open, editing, onClose, onSave }: {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setSave(true)
-    await onSave(form, editing?.id); setSave(false)
+    const payload: ReceitaInsert = { ...form }
+    if (!editing && form.recorrente) {
+      payload.parcela_total = parcelaModo === 'parcelado' ? parcelaQtd : null
+    }
+    await onSave(payload, editing?.id); setSave(false)
   }
 
   const isAsaas = editing?.origem === 'asaas'
+  const isSerie = !!editing?.serie_id
 
   const inp = `w-full bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg px-3 py-2 text-white text-sm
     focus:outline-none focus:border-violet-600 transition-colors`
@@ -168,6 +202,56 @@ function ModalReceita({ open, editing, onClose, onSave }: {
               <label className={lbl}>Observação — opcional</label>
               <input type="text" value={form.observacao ?? ''} onChange={e => set('observacao', e.target.value)} className={inp} />
             </div>
+
+            {/* Recorrência */}
+            <div className="col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.recorrente ?? false}
+                  onChange={e => { set('recorrente', e.target.checked); if (e.target.checked && !form.periodicidade) set('periodicidade', 'Mensal') }}
+                  className="w-4 h-4 accent-violet-600" />
+                <span className="text-sm text-gray-300">↺ Receita recorrente (ex: mensalidade)</span>
+              </label>
+            </div>
+            {form.recorrente && (
+              <div className="col-span-2 space-y-3 bg-violet-900/10 border border-violet-800/30 rounded-lg p-3">
+                {editing ? (
+                  <p className="text-xs text-violet-300">
+                    ↺ {isSerie
+                      ? `Lançamento de uma série${editing?.parcela_total ? ` (parcela ${editing.parcela_num}/${editing.parcela_total})` : ' contínua'}.`
+                      : 'Receita recorrente.'} Alterações afetam <span className="font-semibold">apenas este lançamento</span>.
+                  </p>
+                ) : (
+                  <>
+                    <div>
+                      <label className={lbl}>Periodicidade</label>
+                      <select value={form.periodicidade ?? 'Mensal'} onChange={e => set('periodicidade', e.target.value)} className={inp}>
+                        {PERIODICIDADES.map(p => <option key={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setParcelaModo('continuo')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-colors ${parcelaModo === 'continuo' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-[#0a0a0f] border-[#2d2d3d] text-gray-400'}`}>
+                        Contínuo
+                      </button>
+                      <button type="button" onClick={() => setParcelaModo('parcelado')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-colors ${parcelaModo === 'parcelado' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-[#0a0a0f] border-[#2d2d3d] text-gray-400'}`}>
+                        Nº de parcelas
+                      </button>
+                    </div>
+                    {parcelaModo === 'parcelado' && (
+                      <input type="number" min={2} max={120} value={parcelaQtd}
+                        onChange={e => setParcelaQtd(Math.max(2, parseInt(e.target.value) || 2))}
+                        className={inp} />
+                    )}
+                    <p className="text-[11px] text-violet-300/80">
+                      {parcelaModo === 'parcelado'
+                        ? `Serão lançadas ${parcelaQtd} parcelas a partir da data.`
+                        : 'Serão lançados 12 meses à frente (renovados automaticamente).'}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
@@ -230,9 +314,27 @@ export default function ReceitasPage() {
   }
 
   async function handleSave(r: ReceitaInsert, id?: string) {
-    const { error } = id
-      ? await supabase.from('receitas').update(r).eq('id', id)
-      : await supabase.from('receitas').insert(r)
+    let error
+    if (id) {
+      const { serie_id: _s, parcela_num: _n, parcela_total: _t, ...editavel } = r
+      void _s; void _n; void _t
+      ;({ error } = await supabase.from('receitas').update(editavel).eq('id', id))
+    } else if (r.recorrente && r.periodicidade) {
+      const total = r.parcela_total ?? 12
+      const serieId = crypto.randomUUID()
+      const ehParcelado = r.parcela_total != null
+      const rows = Array.from({ length: total }, (_, i) => ({
+        ...r,
+        data: addPeriodo(r.data, r.periodicidade!, i),
+        serie_id: serieId,
+        parcela_num: i + 1,
+        parcela_total: ehParcelado ? total : null,
+        descricao: ehParcelado ? `${r.descricao} (${i + 1}/${total})` : r.descricao,
+      }))
+      ;({ error } = await supabase.from('receitas').insert(rows))
+    } else {
+      ;({ error } = await supabase.from('receitas').insert(r))
+    }
     if (error) {
       console.error('[receitas] save:', error)
       alert(`Erro ao salvar: ${error.message}`)
@@ -241,9 +343,20 @@ export default function ReceitasPage() {
     closeModal(); fetchReceitas()
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Excluir esta receita?')) return
-    const { error } = await supabase.from('receitas').delete().eq('id', id)
+  async function handleDelete(r: Receita) {
+    if (r.serie_id) {
+      const serieToda = confirm(
+        'Esta receita faz parte de uma série recorrente.\n\n' +
+        'OK = excluir TODA a série\nCancelar = escolher excluir só esta'
+      )
+      if (serieToda) {
+        const { error } = await supabase.from('receitas').delete().eq('serie_id', r.serie_id)
+        if (error) { alert(`Erro: ${error.message}`); return }
+        fetchReceitas(); return
+      }
+      if (!confirm('Excluir apenas esta receita?')) return
+    } else if (!confirm('Excluir esta receita?')) return
+    const { error } = await supabase.from('receitas').delete().eq('id', r.id)
     if (error) { alert(`Erro: ${error.message}`); return }
     fetchReceitas()
   }
@@ -422,7 +535,16 @@ export default function ReceitasPage() {
                           className="w-4 h-4 accent-violet-600 cursor-pointer align-middle" />
                       </td>
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtData(r.data)}</td>
-                      <td className="px-4 py-3 text-white font-medium max-w-[260px] truncate">{r.descricao || '—'}</td>
+                      <td className="px-4 py-3 text-white font-medium max-w-[260px]">
+                        <span className="truncate block">{r.descricao || '—'}</span>
+                        {r.recorrente && (
+                          <span className="text-violet-400 text-[11px] flex items-center gap-1 mt-0.5">
+                            ↺ {r.periodicidade}
+                            {r.parcela_total ? <span className="text-gray-500">· {r.parcela_num}/{r.parcela_total}</span>
+                             : r.parcela_num ? <span className="text-gray-600">· contínuo</span> : null}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{r.produto}</td>
                       <td className="px-4 py-3 text-gray-400 max-w-[180px] truncate">{r.cliente ?? r.cliente_id ?? '—'}</td>
                       <td className="px-4 py-3 text-emerald-400 font-semibold whitespace-nowrap">{fmt(Number(r.valor))}</td>
@@ -440,7 +562,7 @@ export default function ReceitasPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={() => openEditar(r)} title="Editar"
                             className="text-gray-600 hover:text-violet-400 transition-colors text-sm">✎</button>
-                          <button onClick={() => handleDelete(r.id)} title="Excluir"
+                          <button onClick={() => handleDelete(r)} title="Excluir"
                             className="text-gray-600 hover:text-red-400 transition-colors text-base leading-none">×</button>
                         </div>
                       </td>

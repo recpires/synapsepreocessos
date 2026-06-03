@@ -14,6 +14,7 @@ export type Despesa = {
   observacao?: string
   anexo_url?: string
   anexo_nome?: string
+  anexo_path?: string | null
   serie_id?: string | null
   parcela_num?: number | null
   parcela_total?: number | null
@@ -41,6 +42,11 @@ export type Receita = {
   origem_id?: string
   observacao?: string
   payload_raw?: unknown
+  recorrente?: boolean
+  periodicidade?: string
+  serie_id?: string | null
+  parcela_num?: number | null
+  parcela_total?: number | null
   created_at: string
   updated_at?: string
   created_by?: string

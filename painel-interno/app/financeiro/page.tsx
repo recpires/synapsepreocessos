@@ -12,6 +12,7 @@ import { SUBNAV } from '@/lib/nav'
 import {
   type Despesa,
   type DespesaInsert,
+  type Receita,
   CATEGORIAS,
   FORMAS_PAGAMENTO,
   PRODUTOS_LISTA,
@@ -636,9 +637,10 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
 
 // ─── Despesas View ────────────────────────────────────────────────────────────
 
-function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, onAdd }: {
+function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, onVerAnexo, onAdd }: {
   despesas: Despesa[]; onDelete: (d: Despesa) => void; onDeleteMany: (ids: string[]) => void
-  onEdit: (d: Despesa) => void; onDuplicate: (d: Despesa) => void; onAdd: () => void
+  onEdit: (d: Despesa) => void; onDuplicate: (d: Despesa) => void
+  onVerAnexo: (path: string) => void; onAdd: () => void
 }) {
   const [mesFiltro, setMesFiltro]   = useState('todos')
   const [catFiltro, setCatFiltro]   = useState('Todas')
@@ -799,12 +801,12 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
                       ) : null}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {d.anexo_url ? (
-                        <a href={d.anexo_url} target="_blank" rel="noopener noreferrer"
+                      {d.anexo_path || d.anexo_url ? (
+                        <button onClick={() => d.anexo_path ? onVerAnexo(d.anexo_path) : window.open(d.anexo_url, '_blank')}
                           title={d.anexo_nome ?? 'Ver anexo'}
                           className="text-violet-400 hover:text-violet-300 transition-colors text-base">
                           {d.anexo_nome?.endsWith('.pdf') ? '📄' : '🖼️'}
-                        </a>
+                        </button>
                       ) : (
                         <span className="text-gray-700">—</span>
                       )}
@@ -830,29 +832,169 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
   )
 }
 
+// ─── Projeção de Fluxo de Caixa ───────────────────────────────────────────────
+
+function ProjecaoView({ despesas, receitas }: { despesas: Despesa[]; receitas: Receita[] }) {
+  const [saldoInicial, setSaldoInicial] = useState(0)
+
+  // Janela: mês atual + 11 meses à frente
+  const hoje = new Date()
+  const meses: string[] = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  const receitaValida = (r: Receita) => r.status !== 'cancelado' && r.status !== 'estornado'
+
+  let acumulado = saldoInicial
+  const linhas = meses.map(mes => {
+    const entradas = receitas
+      .filter(r => receitaValida(r) && r.data.startsWith(mes))
+      .reduce((s, r) => s + Number(r.valor), 0)
+    const saidas = despesas
+      .filter(d => d.data.startsWith(mes))
+      .reduce((s, d) => s + Number(d.valor), 0)
+    const resultado = entradas - saidas
+    acumulado += resultado
+    const [ano, m] = mes.split('-')
+    return {
+      mes,
+      label: `${MESES_LABEL[parseInt(m) - 1]}/${ano.slice(2)}`,
+      entradas, saidas, resultado, saldo: acumulado,
+    }
+  })
+
+  const totalEntradas = linhas.reduce((s, l) => s + l.entradas, 0)
+  const totalSaidas   = linhas.reduce((s, l) => s + l.saidas, 0)
+  const saldoFinal    = linhas.length ? linhas[linhas.length - 1].saldo : saldoInicial
+  const primeiroNegativo = linhas.find(l => l.saldo < 0)
+
+  return (
+    <div className="space-y-6">
+      {/* Controles + KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Saldo atual em caixa</p>
+          <input type="number" step="0.01" value={saldoInicial || ''}
+            onChange={e => setSaldoInicial(parseFloat(e.target.value) || 0)}
+            placeholder="0,00"
+            className="w-full bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg px-3 py-1.5 text-lg font-bold text-white focus:outline-none focus:border-violet-600" />
+          <p className="text-[11px] text-gray-600 mt-1">ponto de partida da projeção</p>
+        </div>
+        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Entradas previstas (12m)</p>
+          <p className="text-2xl font-bold text-emerald-400">{fmt(totalEntradas)}</p>
+        </div>
+        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Saídas previstas (12m)</p>
+          <p className="text-2xl font-bold text-red-400">{fmt(totalSaidas)}</p>
+        </div>
+        <div className={`bg-[#111118] border rounded-xl p-5 ${saldoFinal < 0 ? 'border-red-700/60' : 'border-[#1e1e2e]'}`}>
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Saldo projetado (12m)</p>
+          <p className={`text-2xl font-bold ${saldoFinal < 0 ? 'text-red-400' : 'text-violet-400'}`}>{fmt(saldoFinal)}</p>
+        </div>
+      </div>
+
+      {primeiroNegativo && (
+        <div className="bg-red-900/20 border border-red-800/40 rounded-xl p-4">
+          <p className="text-sm text-red-300">
+            ⚠️ <span className="font-semibold">Atenção ao caixa:</span> a projeção fica negativa em{' '}
+            <span className="font-bold">{primeiroNegativo.label}</span> ({fmt(primeiroNegativo.saldo)}).
+            Ajuste o saldo inicial ou reveja despesas/receitas desse período.
+          </p>
+        </div>
+      )}
+
+      {/* Gráfico do saldo acumulado */}
+      <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
+        <h3 className="text-sm font-medium text-gray-300 mb-4">Saldo de caixa projetado</h3>
+        <ResponsiveContainer width="100%" height={240}>
+          <AreaChart data={linhas}>
+            <defs>
+              <linearGradient id="gSaldo" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" vertical={false} />
+            <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
+            <Tooltip content={<ChartTooltip />} />
+            <Area type="monotone" dataKey="saldo" name="Saldo" stroke="#7c3aed" fill="url(#gSaldo)" strokeWidth={2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Tabela mês a mês */}
+      <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[520px]">
+            <thead className="bg-[#0d0d14]">
+              <tr>{['Mês', 'Entradas', 'Saídas', 'Resultado', 'Saldo acumulado'].map(h => (
+                <th key={h} className="px-4 py-3 text-[11px] text-gray-500 uppercase tracking-wider font-medium text-left first:pl-4">{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {linhas.map((l, i) => (
+                <tr key={l.mes} className={`border-t border-[#1e1e2e] ${i % 2 ? 'bg-[#0a0a10]' : ''}`}>
+                  <td className="px-4 py-2.5 font-medium text-gray-200">{l.label}</td>
+                  <td className="px-4 py-2.5 text-emerald-400">{l.entradas ? fmt(l.entradas) : '—'}</td>
+                  <td className="px-4 py-2.5 text-red-400">{l.saidas ? fmt(l.saidas) : '—'}</td>
+                  <td className={`px-4 py-2.5 font-medium ${l.resultado >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {l.resultado >= 0 ? '+' : ''}{fmt(l.resultado)}
+                  </td>
+                  <td className={`px-4 py-2.5 font-bold ${l.saldo < 0 ? 'text-red-400' : 'text-violet-300'}`}>{fmt(l.saldo)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-600">
+        💡 Projeção baseada nos lançamentos já registrados (incluindo despesas fixas e parcelas futuras).
+        Cadastre receitas recorrentes para enriquecer as entradas previstas.
+      </p>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FinanceiroPage() {
   const supabase = createClient()
 
   const [despesas, setDespesas]   = useState<Despesa[]>([])
+  const [receitas, setReceitas]   = useState<Receita[]>([])
   const [loading, setLoading]     = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<Despesa | null>(null)
   const [duplicando, setDuplicando] = useState<Despesa | null>(null)
-  const [aba, setAba]             = useState<'dashboard' | 'despesas'>('dashboard')
+  const [aba, setAba]             = useState<'dashboard' | 'despesas' | 'projecao'>('dashboard')
   const [mesGlobal, setMesGlobal] = useState('geral')
 
   const fetchDespesas = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('despesas').select('*').order('data', { ascending: false })
-    setDespesas(data ?? [])
+    const [{ data: desp }, { data: rec }] = await Promise.all([
+      supabase.from('despesas').select('*').order('data', { ascending: false }),
+      supabase.from('receitas').select('*').order('data', { ascending: false }),
+    ])
+    setDespesas(desp ?? [])
+    setReceitas((rec as Receita[]) ?? [])
     setLoading(false)
   }, [supabase])
 
   useEffect(() => {
     fetchDespesas()
   }, [fetchDespesas])
+
+  async function verAnexo(path: string) {
+    const { data, error } = await supabase.storage
+      .from('financeiro-anexos')
+      .createSignedUrl(path, 120)
+    if (error || !data?.signedUrl) { alert('Não foi possível abrir o anexo.'); return }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
 
   function openNova() {
     setEditing(null)
@@ -888,10 +1030,8 @@ export default function FinanceiroPage() {
         .from('financeiro-anexos')
         .upload(path, file, { contentType: file.type, upsert: false })
       if (!uploadError && uploadData) {
-        const { data: urlData } = supabase.storage
-          .from('financeiro-anexos')
-          .getPublicUrl(uploadData.path)
-        payload.anexo_url = urlData.publicUrl
+        // bucket privado → guardamos o path; a URL é assinada na hora de ver
+        payload.anexo_path = uploadData.path
         payload.anexo_nome = file.name
       }
     }
@@ -914,7 +1054,7 @@ export default function FinanceiroPage() {
         parcela_total: ehParcelado ? total : null,
         descricao: ehParcelado ? `${payload.descricao} (${i + 1}/${total})` : payload.descricao,
         // anexo só na primeira ocorrência (evita duplicar o mesmo comprovante)
-        anexo_url:  i === 0 ? payload.anexo_url  : undefined,
+        anexo_path: i === 0 ? payload.anexo_path : undefined,
         anexo_nome: i === 0 ? payload.anexo_nome : undefined,
       }))
       await supabase.from('despesas').insert(rows)
@@ -1007,12 +1147,12 @@ export default function FinanceiroPage() {
 
             {/* Abas */}
             <div className="flex items-center gap-2 bg-[#111118] border border-[#1e1e2e] rounded-xl p-1">
-              {(['dashboard', 'despesas'] as const).map(t => (
+              {(['dashboard', 'despesas', 'projecao'] as const).map(t => (
                 <button key={t} onClick={() => setAba(t)}
                   className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     aba === t ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
                   }`}>
-                  {t === 'dashboard' ? '📊 Dashboard' : '📋 Despesas'}
+                  {t === 'dashboard' ? '📊 Dashboard' : t === 'despesas' ? '📋 Despesas' : '📈 Projeção'}
                 </button>
               ))}
             </div>
@@ -1023,8 +1163,10 @@ export default function FinanceiroPage() {
           <div className="flex items-center justify-center py-32 text-gray-600">Carregando…</div>
         ) : aba === 'dashboard' ? (
           <DashboardView despesas={despesasDashboard} periodo={mesGlobal} />
+        ) : aba === 'projecao' ? (
+          <ProjecaoView despesas={despesas} receitas={receitas} />
         ) : (
-          <DespesasView despesas={despesas} onDelete={handleDelete} onDeleteMany={handleDeleteMany} onEdit={openEditar} onDuplicate={openDuplicar} onAdd={openNova} />
+          <DespesasView despesas={despesas} onDelete={handleDelete} onDeleteMany={handleDeleteMany} onEdit={openEditar} onDuplicate={openDuplicar} onVerAnexo={verAnexo} onAdd={openNova} />
         )}
       </div>
 
