@@ -116,29 +116,35 @@ const EMPTY_FORM: DespesaInsert = {
   created_by: 'painel',
 }
 
-function despesaToForm(d: Despesa): DespesaInsert {
+function despesaToForm(d: Despesa, opts?: { duplicar?: boolean }): DespesaInsert {
   return {
     data: d.data,
-    descricao: d.descricao,
+    descricao: opts?.duplicar ? `${d.descricao} (cópia)` : d.descricao,
     categoria: d.categoria,
     produto: d.produto,
     forma_pagamento: d.forma_pagamento,
     condicao: d.condicao,
-    valor: d.valor,
+    // o input mostra o valor BASE (antes da taxa); o total é recalculado no submit
+    valor: d.valor_base ?? d.valor,
     tipo: d.tipo,
-    recorrente: d.recorrente,
-    periodicidade: d.periodicidade,
-    proxima_data: d.proxima_data,
+    // duplicata nasce como lançamento único — não herda a série
+    recorrente: opts?.duplicar ? false : d.recorrente,
+    periodicidade: opts?.duplicar ? undefined : d.periodicidade,
+    proxima_data: opts?.duplicar ? undefined : d.proxima_data,
     observacao: d.observacao,
-    anexo_url: d.anexo_url,
-    anexo_nome: d.anexo_nome,
+    anexo_url: opts?.duplicar ? undefined : d.anexo_url,
+    anexo_nome: opts?.duplicar ? undefined : d.anexo_nome,
+    internacional: d.internacional ?? false,
+    taxa_pct: d.taxa_pct ?? null,
+    valor_base: d.valor_base ?? null,
     created_by: d.created_by,
   }
 }
 
-function ModalDespesa({ open, editing, onClose, onSave }: {
+function ModalDespesa({ open, editing, duplicando, onClose, onSave }: {
   open: boolean
   editing: Despesa | null
+  duplicando: Despesa | null
   onClose: () => void
   onSave: (d: DespesaInsert, file: File | undefined, id?: string) => Promise<void>
 }) {
@@ -147,15 +153,24 @@ function ModalDespesa({ open, editing, onClose, onSave }: {
   const [saving, setSaving] = useState(false)
   const [parcelaModo, setParcelaModo] = useState<'continuo' | 'parcelado'>('continuo')
   const [parcelaQtd, setParcelaQtd]   = useState(12)
+  const [internacional, setInternacional] = useState(false)
+  const [taxaPct, setTaxaPct]             = useState(0)
 
   useEffect(() => {
     if (open) {
-      setForm(editing ? despesaToForm(editing) : EMPTY_FORM)
+      const base = editing ?? duplicando
+      setForm(
+        editing ? despesaToForm(editing)
+        : duplicando ? despesaToForm(duplicando, { duplicar: true })
+        : EMPTY_FORM
+      )
       setArquivo(null)
       setParcelaModo(editing?.parcela_total ? 'parcelado' : 'continuo')
       setParcelaQtd(editing?.parcela_total ?? 12)
+      setInternacional(base?.internacional ?? false)
+      setTaxaPct(base?.taxa_pct ?? 0)
     }
-  }, [open, editing])
+  }, [open, editing, duplicando])
   if (!open) return null
 
   const set = (k: keyof DespesaInsert, v: unknown) => setForm(f => ({ ...f, [k]: v }))
@@ -163,10 +178,21 @@ function ModalDespesa({ open, editing, onClose, onSave }: {
   // Em edição não regeneramos a série — apenas o registro atual é alterado.
   const isSerieExistente = !!editing?.serie_id
 
+  // Valor base digitado + taxa internacional = total
+  const valorBase  = Number(form.valor) || 0
+  const valorTaxa  = internacional ? valorBase * (taxaPct / 100) : 0
+  const valorTotal = Math.round((valorBase + valorTaxa) * 100) / 100
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const payload: DespesaInsert = { ...form }
+    const payload: DespesaInsert = {
+      ...form,
+      valor: valorTotal,
+      valor_base: internacional ? valorBase : null,
+      taxa_pct: internacional ? taxaPct : null,
+      internacional,
+    }
     if (!editing && form.recorrente) {
       payload.parcela_total = parcelaModo === 'parcelado' ? parcelaQtd : null
     }
@@ -185,17 +211,49 @@ function ModalDespesa({ open, editing, onClose, onSave }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-[#1e1e2e]">
-          <h2 className="font-semibold text-white">{editing ? 'Editar Despesa' : 'Nova Despesa'}</h2>
+          <h2 className="font-semibold text-white">{editing ? 'Editar Despesa' : duplicando ? 'Duplicar Despesa' : 'Nova Despesa'}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Data</label>
               <input type="date" value={form.data} onChange={e => set('data', e.target.value)} required className={inp} /></div>
-            <div><label className={lbl}>Valor (R$)</label>
+            <div><label className={lbl}>{internacional ? 'Valor base (R$)' : 'Valor (R$)'}</label>
               <input type="number" step="0.01" min="0" value={form.valor || ''}
                 onChange={e => set('valor', parseFloat(e.target.value) || 0)} required className={inp} /></div>
           </div>
+
+          {/* Taxa internacional (IOF/spread em serviço de fora do Brasil) */}
+          <div className="bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg p-3 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={internacional}
+                onChange={e => { setInternacional(e.target.checked); if (e.target.checked && !taxaPct) setTaxaPct(6.38) }}
+                className="w-4 h-4 accent-violet-600" />
+              <span className="text-sm text-gray-300">🌎 Serviço internacional (cobrar taxa)</span>
+            </label>
+            {internacional && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>Taxa (%)</label>
+                    <input type="number" step="0.01" min="0" value={taxaPct || ''}
+                      onChange={e => setTaxaPct(parseFloat(e.target.value) || 0)}
+                      placeholder="ex: 6,38 (IOF)" className={inp} />
+                  </div>
+                  <div>
+                    <label className={lbl}>Taxa em R$</label>
+                    <input type="text" disabled value={fmt(valorTaxa)}
+                      className={`${inp} opacity-60 cursor-not-allowed`} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm pt-1 border-t border-[#1e1e2e]">
+                  <span className="text-gray-400">Valor total com taxa</span>
+                  <span className="font-bold text-violet-300">{fmt(valorTotal)}</span>
+                </div>
+              </>
+            )}
+          </div>
+
           <div><label className={lbl}>Descrição</label>
             <input type="text" value={form.descricao} onChange={e => set('descricao', e.target.value)}
               placeholder="ex: Supabase, Vercel…" required className={inp} /></div>
@@ -578,8 +636,9 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
 
 // ─── Despesas View ────────────────────────────────────────────────────────────
 
-function DespesasView({ despesas, onDelete, onEdit, onAdd }: {
-  despesas: Despesa[]; onDelete: (d: Despesa) => void; onEdit: (d: Despesa) => void; onAdd: () => void
+function DespesasView({ despesas, onDelete, onEdit, onDuplicate, onAdd }: {
+  despesas: Despesa[]; onDelete: (d: Despesa) => void; onEdit: (d: Despesa) => void
+  onDuplicate: (d: Despesa) => void; onAdd: () => void
 }) {
   const [mesFiltro, setMesFiltro]   = useState('todos')
   const [catFiltro, setCatFiltro]   = useState('Todas')
@@ -685,7 +744,12 @@ function DespesasView({ despesas, onDelete, onEdit, onAdd }: {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`text-xs font-medium ${TIPO_CORES[d.tipo] ?? 'text-gray-400'}`}>{d.tipo}</span>
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-white">{fmt(Number(d.valor))}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-white">
+                      {fmt(Number(d.valor))}
+                      {d.internacional && d.taxa_pct ? (
+                        <span className="block text-[10px] text-gray-500 font-normal">🌎 incl. {d.taxa_pct}% taxa</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       {d.anexo_url ? (
                         <a href={d.anexo_url} target="_blank" rel="noopener noreferrer"
@@ -699,6 +763,8 @@ function DespesasView({ despesas, onDelete, onEdit, onAdd }: {
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => onDuplicate(d)} title="Duplicar"
+                          className="text-gray-600 hover:text-blue-400 transition-colors text-sm">⧉</button>
                         <button onClick={() => onEdit(d)} title="Editar"
                           className="text-gray-600 hover:text-violet-400 transition-colors text-sm">✎</button>
                         <button onClick={() => onDelete(d)} title="Excluir"
@@ -725,6 +791,7 @@ export default function FinanceiroPage() {
   const [loading, setLoading]     = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<Despesa | null>(null)
+  const [duplicando, setDuplicando] = useState<Despesa | null>(null)
   const [aba, setAba]             = useState<'dashboard' | 'despesas'>('dashboard')
   const [mesGlobal, setMesGlobal] = useState('geral')
 
@@ -741,17 +808,26 @@ export default function FinanceiroPage() {
 
   function openNova() {
     setEditing(null)
+    setDuplicando(null)
     setModalOpen(true)
   }
 
   function openEditar(d: Despesa) {
     setEditing(d)
+    setDuplicando(null)
+    setModalOpen(true)
+  }
+
+  function openDuplicar(d: Despesa) {
+    setEditing(null)
+    setDuplicando(d)
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
     setEditing(null)
+    setDuplicando(null)
   }
 
   async function handleSave(d: DespesaInsert, file: File | undefined, id?: string) {
@@ -894,11 +970,11 @@ export default function FinanceiroPage() {
         ) : aba === 'dashboard' ? (
           <DashboardView despesas={despesasDashboard} periodo={mesGlobal} />
         ) : (
-          <DespesasView despesas={despesas} onDelete={handleDelete} onEdit={openEditar} onAdd={openNova} />
+          <DespesasView despesas={despesas} onDelete={handleDelete} onEdit={openEditar} onDuplicate={openDuplicar} onAdd={openNova} />
         )}
       </div>
 
-      <ModalDespesa open={modalOpen} editing={editing} onClose={closeModal} onSave={handleSave} />
+      <ModalDespesa open={modalOpen} editing={editing} duplicando={duplicando} onClose={closeModal} onSave={handleSave} />
     </PainelShell>
   )
 }

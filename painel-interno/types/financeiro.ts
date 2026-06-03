@@ -17,6 +17,9 @@ export type Despesa = {
   serie_id?: string | null
   parcela_num?: number | null
   parcela_total?: number | null
+  internacional?: boolean
+  taxa_pct?: number | null
+  valor_base?: number | null
   created_at: string
   created_by: string
 }
