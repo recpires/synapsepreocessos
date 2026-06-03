@@ -38,7 +38,7 @@ const PRODUTOS: Produto[] = [
     icon: '💈', nome: 'Nero Barber',
     tagline: 'Plataforma premium para barbearias modernas',
     status: 'Maduro', statusCor: 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/40',
-    pct: 98,
+    pct: 88,
     descCurta: 'SaaS PWA para barbearias — agendamento inteligente, caixa digital, CRM e fidelização.',
     descLonga: 'Mais do que um agendador — um ecossistema completo de gestão que transforma barbearias em negócios de alta performance. Do agendamento online ao controle financeiro, do estoque ao clube de fidelidade, o Nero oferece tudo em uma plataforma com identidade premium e suporte a white-label para franquias e redes.',
     personalidade: 'Premium · Dark · Sofisticado · Direto. A experiência visual remete ao ambiente da barbearia clássica com toques modernos — preto e ouro.',
