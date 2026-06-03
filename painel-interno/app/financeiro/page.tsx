@@ -636,14 +636,15 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
 
 // ─── Despesas View ────────────────────────────────────────────────────────────
 
-function DespesasView({ despesas, onDelete, onEdit, onDuplicate, onAdd }: {
-  despesas: Despesa[]; onDelete: (d: Despesa) => void; onEdit: (d: Despesa) => void
-  onDuplicate: (d: Despesa) => void; onAdd: () => void
+function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, onAdd }: {
+  despesas: Despesa[]; onDelete: (d: Despesa) => void; onDeleteMany: (ids: string[]) => void
+  onEdit: (d: Despesa) => void; onDuplicate: (d: Despesa) => void; onAdd: () => void
 }) {
   const [mesFiltro, setMesFiltro]   = useState('todos')
   const [catFiltro, setCatFiltro]   = useState('Todas')
   const [tipoFiltro, setTipoFiltro] = useState('todos')
   const [busca, setBusca]           = useState('')
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
 
   const filtradas = despesas.filter(d => {
     const matchMes   = mesFiltro === 'todos'  || d.data.startsWith(mesFiltro)
@@ -657,6 +658,25 @@ function DespesasView({ despesas, onDelete, onEdit, onDuplicate, onAdd }: {
 
   const totalFiltrado = filtradas.reduce((s, d) => s + Number(d.valor), 0)
   const mesesDisponiveis = Array.from(new Set(despesas.map(d => d.data.slice(0, 7)))).sort().reverse()
+
+  const toggleUm = (id: string) => setSelecionados(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+  const todosMarcados = filtradas.length > 0 && filtradas.every(d => selecionados.has(d.id))
+  const toggleTodos = () => setSelecionados(
+    todosMarcados ? new Set() : new Set(filtradas.map(d => d.id))
+  )
+  const limparSelecao = () => setSelecionados(new Set())
+  const excluirSelecionados = () => {
+    const ids = filtradas.filter(d => selecionados.has(d.id)).map(d => d.id)
+    if (ids.length) onDeleteMany(ids)
+    limparSelecao()
+  }
+  const totalSelecionado = filtradas
+    .filter(d => selecionados.has(d.id))
+    .reduce((s, d) => s + Number(d.valor), 0)
 
   const sel = `bg-[#111118] border border-[#2d2d3d] text-sm text-gray-300 rounded-lg px-3 py-2
     focus:outline-none focus:border-violet-600 transition-colors`
@@ -696,6 +716,24 @@ function DespesasView({ despesas, onDelete, onEdit, onDuplicate, onAdd }: {
         </div>
       </div>
 
+      {/* Barra de ação em massa */}
+      {selecionados.size > 0 && (
+        <div className="flex items-center justify-between bg-violet-900/20 border border-violet-800/40 rounded-lg px-4 py-2.5">
+          <span className="text-sm text-violet-200">
+            <span className="font-semibold">{selecionados.size}</span> selecionado{selecionados.size > 1 ? 's' : ''}
+            <span className="text-violet-300/70"> · {fmt(totalSelecionado)}</span>
+          </span>
+          <div className="flex items-center gap-3">
+            <button onClick={limparSelecao}
+              className="text-xs text-gray-400 hover:text-white transition-colors">Limpar seleção</button>
+            <button onClick={excluirSelecionados}
+              className="flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors">
+              🗑️ Excluir selecionados
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
         {filtradas.length === 0 ? (
           <div className="flex items-center justify-center py-20 text-gray-600">Nenhuma despesa encontrada.</div>
@@ -704,6 +742,10 @@ function DespesasView({ despesas, onDelete, onEdit, onDuplicate, onAdd }: {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#1e1e2e]">
+                  <th className="px-4 py-3 w-10">
+                    <input type="checkbox" checked={todosMarcados} onChange={toggleTodos}
+                      title="Selecionar todos" className="w-4 h-4 accent-violet-600 cursor-pointer align-middle" />
+                  </th>
                   {['Data','Descrição','Categoria','Produto','Forma','Tipo','Valor','📎',''].map(h => (
                     <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap">{h}</th>
                   ))}
@@ -712,7 +754,13 @@ function DespesasView({ despesas, onDelete, onEdit, onDuplicate, onAdd }: {
               <tbody>
                 {filtradas.map((d, i) => (
                   <tr key={d.id}
-                    className={`border-b border-[#1e1e2e]/60 hover:bg-[#1e1e2e]/40 transition-colors ${i === filtradas.length - 1 ? 'border-b-0' : ''}`}>
+                    className={`border-b border-[#1e1e2e]/60 transition-colors ${i === filtradas.length - 1 ? 'border-b-0' : ''} ${
+                      selecionados.has(d.id) ? 'bg-violet-900/20' : 'hover:bg-[#1e1e2e]/40'
+                    }`}>
+                    <td className="px-4 py-3">
+                      <input type="checkbox" checked={selecionados.has(d.id)} onChange={() => toggleUm(d.id)}
+                        className="w-4 h-4 accent-violet-600 cursor-pointer align-middle" />
+                    </td>
                     <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
                       {new Date(d.data + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </td>
@@ -899,6 +947,12 @@ export default function FinanceiroPage() {
     fetchDespesas()
   }
 
+  async function handleDeleteMany(ids: string[]) {
+    if (!confirm(`Excluir ${ids.length} lançamento${ids.length > 1 ? 's' : ''} selecionado${ids.length > 1 ? 's' : ''}?`)) return
+    await supabase.from('despesas').delete().in('id', ids)
+    fetchDespesas()
+  }
+
   // Meses disponíveis para o filtro global
   const mesesDisponiveis = Array.from(new Set(despesas.map(d => d.data.slice(0, 7)))).sort().reverse()
 
@@ -970,7 +1024,7 @@ export default function FinanceiroPage() {
         ) : aba === 'dashboard' ? (
           <DashboardView despesas={despesasDashboard} periodo={mesGlobal} />
         ) : (
-          <DespesasView despesas={despesas} onDelete={handleDelete} onEdit={openEditar} onDuplicate={openDuplicar} onAdd={openNova} />
+          <DespesasView despesas={despesas} onDelete={handleDelete} onDeleteMany={handleDeleteMany} onEdit={openEditar} onDuplicate={openDuplicar} onAdd={openNova} />
         )}
       </div>
 

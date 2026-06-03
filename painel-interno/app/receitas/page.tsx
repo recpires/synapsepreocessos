@@ -198,6 +198,7 @@ export default function ReceitasPage() {
   const [produtoF, setProdutoF]   = useState('Todos')
   const [origemF, setOrigemF]     = useState('Todos')
   const [statusF, setStatusF]     = useState('Todos')
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
 
   const fetchReceitas = useCallback(async () => {
     setLoading(true)
@@ -247,6 +248,14 @@ export default function ReceitasPage() {
     fetchReceitas()
   }
 
+  async function handleDeleteMany(ids: string[]) {
+    if (!confirm(`Excluir ${ids.length} receita${ids.length > 1 ? 's' : ''} selecionada${ids.length > 1 ? 's' : ''}?`)) return
+    const { error } = await supabase.from('receitas').delete().in('id', ids)
+    if (error) { alert(`Erro: ${error.message}`); return }
+    setSelecionados(new Set())
+    fetchReceitas()
+  }
+
   // Filtros
   const filtradas = receitas.filter(r => {
     const matchBusca   = !busca || (r.descricao ?? '').toLowerCase().includes(busca.toLowerCase()) ||
@@ -256,6 +265,20 @@ export default function ReceitasPage() {
     const matchStatus  = statusF  === 'Todos' || r.status  === statusF
     return matchBusca && matchProduto && matchOrigem && matchStatus
   })
+
+  // Seleção múltipla
+  const toggleUm = (id: string) => setSelecionados(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+  const todosMarcados = filtradas.length > 0 && filtradas.every(r => selecionados.has(r.id))
+  const toggleTodos = () => setSelecionados(todosMarcados ? new Set() : new Set(filtradas.map(r => r.id)))
+  const excluirSelecionados = () => {
+    const ids = filtradas.filter(r => selecionados.has(r.id)).map(r => r.id)
+    if (ids.length) handleDeleteMany(ids)
+  }
+  const totalSelecionado = filtradas.filter(r => selecionados.has(r.id)).reduce((s, r) => s + Number(r.valor), 0)
 
   // KPIs (só status recebido/confirmado contam para total)
   const valido       = (r: Receita) => r.status === 'recebido' || r.status === 'confirmado'
@@ -346,6 +369,24 @@ export default function ReceitasPage() {
           </div>
         </div>
 
+        {/* Barra de ação em massa */}
+        {selecionados.size > 0 && (
+          <div className="flex items-center justify-between bg-violet-900/20 border border-violet-800/40 rounded-lg px-4 py-2.5">
+            <span className="text-sm text-violet-200">
+              <span className="font-semibold">{selecionados.size}</span> selecionada{selecionados.size > 1 ? 's' : ''}
+              <span className="text-violet-300/70"> · {fmt(totalSelecionado)}</span>
+            </span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSelecionados(new Set())}
+                className="text-xs text-gray-400 hover:text-white transition-colors">Limpar seleção</button>
+              <button onClick={excluirSelecionados}
+                className="flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors">
+                🗑️ Excluir selecionadas
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Lista */}
         <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
           {loading ? (
@@ -361,6 +402,10 @@ export default function ReceitasPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#1e1e2e]">
+                    <th className="px-4 py-3 w-10">
+                      <input type="checkbox" checked={todosMarcados} onChange={toggleTodos}
+                        title="Selecionar todas" className="w-4 h-4 accent-violet-600 cursor-pointer align-middle" />
+                    </th>
                     {['Data','Descrição','Produto','Cliente','Valor','Forma','Tipo','Status','Origem',''].map(h => (
                       <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap">{h}</th>
                     ))}
@@ -369,7 +414,13 @@ export default function ReceitasPage() {
                 <tbody>
                   {filtradas.map((r, i) => (
                     <tr key={r.id}
-                      className={`border-b border-[#1e1e2e]/60 hover:bg-[#1e1e2e]/40 transition-colors ${i === filtradas.length - 1 ? 'border-b-0' : ''}`}>
+                      className={`border-b border-[#1e1e2e]/60 transition-colors ${i === filtradas.length - 1 ? 'border-b-0' : ''} ${
+                        selecionados.has(r.id) ? 'bg-violet-900/20' : 'hover:bg-[#1e1e2e]/40'
+                      }`}>
+                      <td className="px-4 py-3">
+                        <input type="checkbox" checked={selecionados.has(r.id)} onChange={() => toggleUm(r.id)}
+                          className="w-4 h-4 accent-violet-600 cursor-pointer align-middle" />
+                      </td>
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtData(r.data)}</td>
                       <td className="px-4 py-3 text-white font-medium max-w-[260px] truncate">{r.descricao || '—'}</td>
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{r.produto}</td>
