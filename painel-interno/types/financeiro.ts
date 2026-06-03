@@ -14,6 +14,9 @@ export type Despesa = {
   observacao?: string
   anexo_url?: string
   anexo_nome?: string
+  serie_id?: string | null
+  parcela_num?: number | null
+  parcela_total?: number | null
   created_at: string
   created_by: string
 }

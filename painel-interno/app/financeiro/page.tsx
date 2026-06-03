@@ -34,6 +34,26 @@ function mesAtual() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+// Soma N períodos a uma data 'YYYY-MM-DD' conforme a periodicidade.
+// Para Mensal/Anual mantém o dia, com clamp no último dia do mês (ex: 31 jan → 28 fev).
+function addPeriodo(dataISO: string, periodicidade: string, n: number): string {
+  const [y, m, d] = dataISO.split('-').map(Number)
+  if (periodicidade === 'Semanal' || periodicidade === 'Quinzenal') {
+    const dias = (periodicidade === 'Semanal' ? 7 : 15) * n
+    const dt = new Date(Date.UTC(y, m - 1, d))
+    dt.setUTCDate(dt.getUTCDate() + dias)
+    return dt.toISOString().slice(0, 10)
+  }
+  // Mensal (default) ou Anual
+  const passoMeses = periodicidade === 'Anual' ? 12 : 1
+  const totalMeses = (m - 1) + passoMeses * n
+  const novoAno = y + Math.floor(totalMeses / 12)
+  const novoMes = totalMeses % 12 // 0-11
+  const ultimoDia = new Date(Date.UTC(novoAno, novoMes + 1, 0)).getUTCDate()
+  const dia = Math.min(d, ultimoDia)
+  return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+
 const CHART_COLORS = ['#7c3aed','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16','#f97316']
 
 const TIPO_CORES: Record<string, string> = {
@@ -125,21 +145,32 @@ function ModalDespesa({ open, editing, onClose, onSave }: {
   const [form, setForm] = useState<DespesaInsert>(EMPTY_FORM)
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [parcelaModo, setParcelaModo] = useState<'continuo' | 'parcelado'>('continuo')
+  const [parcelaQtd, setParcelaQtd]   = useState(12)
 
   useEffect(() => {
     if (open) {
       setForm(editing ? despesaToForm(editing) : EMPTY_FORM)
       setArquivo(null)
+      setParcelaModo(editing?.parcela_total ? 'parcelado' : 'continuo')
+      setParcelaQtd(editing?.parcela_total ?? 12)
     }
   }, [open, editing])
   if (!open) return null
 
   const set = (k: keyof DespesaInsert, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
+  // Em edição não regeneramos a série — apenas o registro atual é alterado.
+  const isSerieExistente = !!editing?.serie_id
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await onSave(form, arquivo ?? undefined, editing?.id)
+    const payload: DespesaInsert = { ...form }
+    if (!editing && form.recorrente) {
+      payload.parcela_total = parcelaModo === 'parcelado' ? parcelaQtd : null
+    }
+    await onSave(payload, arquivo ?? undefined, editing?.id)
     setSaving(false)
   }
 
@@ -211,19 +242,58 @@ function ModalDespesa({ open, editing, onClose, onSave }: {
 
           {/* Campos de recorrência — só aparecem quando recorrente=true */}
           {form.recorrente && (
-            <div className="grid grid-cols-2 gap-3 bg-violet-900/10 border border-violet-800/30 rounded-lg p-3">
-              <div>
-                <label className={lbl}>Periodicidade</label>
-                <select value={form.periodicidade ?? 'Mensal'} onChange={e => set('periodicidade', e.target.value)} className={inp}>
-                  {PERIODICIDADES.map(p => <option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={lbl}>Próxima cobrança</label>
-                <input type="date" value={form.proxima_data ?? ''}
-                  onChange={e => set('proxima_data', e.target.value || undefined)}
-                  className={inp} />
-              </div>
+            <div className="space-y-3 bg-violet-900/10 border border-violet-800/30 rounded-lg p-3">
+              {editing ? (
+                <p className="text-xs text-violet-300">
+                  ↺ {isSerieExistente
+                    ? `Lançamento de uma série${editing?.parcela_total ? ` (parcela ${editing.parcela_num}/${editing.parcela_total})` : ' mensal contínua'}.`
+                    : 'Despesa recorrente.'}
+                  {' '}Alterações afetam <span className="font-semibold">apenas este lançamento</span>.
+                </p>
+              ) : (
+                <>
+                  <div>
+                    <label className={lbl}>Periodicidade</label>
+                    <select value={form.periodicidade ?? 'Mensal'} onChange={e => set('periodicidade', e.target.value)} className={inp}>
+                      {PERIODICIDADES.map(p => <option key={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lbl}>Duração</label>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setParcelaModo('continuo')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors border ${
+                          parcelaModo === 'continuo'
+                            ? 'bg-violet-600 border-violet-600 text-white'
+                            : 'bg-[#0a0a0f] border-[#2d2d3d] text-gray-400 hover:text-white'
+                        }`}>
+                        Fixo contínuo
+                      </button>
+                      <button type="button" onClick={() => setParcelaModo('parcelado')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors border ${
+                          parcelaModo === 'parcelado'
+                            ? 'bg-violet-600 border-violet-600 text-white'
+                            : 'bg-[#0a0a0f] border-[#2d2d3d] text-gray-400 hover:text-white'
+                        }`}>
+                        Parcelado
+                      </button>
+                    </div>
+                  </div>
+                  {parcelaModo === 'parcelado' && (
+                    <div>
+                      <label className={lbl}>Número de parcelas</label>
+                      <input type="number" min={2} max={120} value={parcelaQtd}
+                        onChange={e => setParcelaQtd(Math.max(2, parseInt(e.target.value) || 2))}
+                        className={inp} />
+                    </div>
+                  )}
+                  <p className="text-[11px] text-violet-300/80">
+                    {parcelaModo === 'parcelado'
+                      ? `Serão lançadas ${parcelaQtd} parcelas, uma a cada período, a partir da data informada.`
+                      : `Serão lançados 12 meses à frente. Quando o valor mudar, edite o mês específico.`}
+                  </p>
+                </>
+              )}
             </div>
           )}
           <div><label className={lbl}>Observação (opcional)</label>
@@ -509,7 +579,7 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
 // ─── Despesas View ────────────────────────────────────────────────────────────
 
 function DespesasView({ despesas, onDelete, onEdit, onAdd }: {
-  despesas: Despesa[]; onDelete: (id: string) => void; onEdit: (d: Despesa) => void; onAdd: () => void
+  despesas: Despesa[]; onDelete: (d: Despesa) => void; onEdit: (d: Despesa) => void; onAdd: () => void
 }) {
   const [mesFiltro, setMesFiltro]   = useState('todos')
   const [catFiltro, setCatFiltro]   = useState('Todas')
@@ -593,11 +663,15 @@ function DespesasView({ despesas, onDelete, onEdit, onAdd }: {
                         <span className="text-violet-400 text-[11px] flex items-center gap-1 mt-0.5">
                           <span>↺</span>
                           {d.periodicidade && <span>{d.periodicidade}</span>}
-                          {d.proxima_data && (
+                          {d.parcela_total ? (
+                            <span className="text-gray-500">· parcela {d.parcela_num}/{d.parcela_total}</span>
+                          ) : d.parcela_num ? (
+                            <span className="text-gray-600">· fixo contínuo</span>
+                          ) : d.proxima_data ? (
                             <span className="text-gray-600">
                               · próx. {new Date(d.proxima_data + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </span>
-                          )}
+                          ) : null}
                         </span>
                       )}
                     </td>
@@ -627,7 +701,7 @@ function DespesasView({ despesas, onDelete, onEdit, onAdd }: {
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => onEdit(d)} title="Editar"
                           className="text-gray-600 hover:text-violet-400 transition-colors text-sm">✎</button>
-                        <button onClick={() => onDelete(d.id)} title="Excluir"
+                        <button onClick={() => onDelete(d)} title="Excluir"
                           className="text-gray-600 hover:text-red-400 transition-colors text-base leading-none">×</button>
                       </div>
                     </td>
@@ -699,7 +773,27 @@ export default function FinanceiroPage() {
     }
 
     if (id) {
-      await supabase.from('despesas').update(payload).eq('id', id)
+      // Edição: altera apenas o registro atual (não regenera a série)
+      const { serie_id: _s, parcela_num: _n, parcela_total: _t, ...editavel } = payload
+      void _s; void _n; void _t
+      await supabase.from('despesas').update(editavel).eq('id', id)
+    } else if (payload.recorrente && payload.periodicidade) {
+      // Nova despesa recorrente → gera a série de lançamentos
+      const total = payload.parcela_total ?? 12 // contínuo = janela de 12 ocorrências
+      const serieId = crypto.randomUUID()
+      const ehParcelado = payload.parcela_total != null
+      const rows = Array.from({ length: total }, (_, i) => ({
+        ...payload,
+        data: addPeriodo(payload.data, payload.periodicidade!, i),
+        serie_id: serieId,
+        parcela_num: i + 1,
+        parcela_total: ehParcelado ? total : null,
+        descricao: ehParcelado ? `${payload.descricao} (${i + 1}/${total})` : payload.descricao,
+        // anexo só na primeira ocorrência (evita duplicar o mesmo comprovante)
+        anexo_url:  i === 0 ? payload.anexo_url  : undefined,
+        anexo_nome: i === 0 ? payload.anexo_nome : undefined,
+      }))
+      await supabase.from('despesas').insert(rows)
     } else {
       await supabase.from('despesas').insert(payload)
     }
@@ -707,9 +801,25 @@ export default function FinanceiroPage() {
     fetchDespesas()
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(d: Despesa) {
+    if (d.serie_id) {
+      const apenasEste = confirm(
+        `Esta despesa faz parte de uma série recorrente.\n\n` +
+        `OK = excluir TODA a série\n` +
+        `Cancelar = escolher excluir só este lançamento`
+      )
+      if (apenasEste) {
+        await supabase.from('despesas').delete().eq('serie_id', d.serie_id)
+        fetchDespesas()
+        return
+      }
+      if (!confirm('Excluir apenas este lançamento?')) return
+      await supabase.from('despesas').delete().eq('id', d.id)
+      fetchDespesas()
+      return
+    }
     if (!confirm('Excluir esta despesa?')) return
-    await supabase.from('despesas').delete().eq('id', id)
+    await supabase.from('despesas').delete().eq('id', d.id)
     fetchDespesas()
   }
 
