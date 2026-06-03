@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
 import SubNav from '@/components/SubNav'
+import { toast, confirmar } from '@/components/Feedback'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Receita,
@@ -337,35 +338,43 @@ export default function ReceitasPage() {
     }
     if (error) {
       console.error('[receitas] save:', error)
-      alert(`Erro ao salvar: ${error.message}`)
+      toast.error(`Erro ao salvar: ${error.message}`)
       return
     }
+    toast.success(id ? 'Receita atualizada' : 'Receita lançada')
     closeModal(); fetchReceitas()
   }
 
   async function handleDelete(r: Receita) {
     if (r.serie_id) {
-      const serieToda = confirm(
-        'Esta receita faz parte de uma série recorrente.\n\n' +
-        'OK = excluir TODA a série\nCancelar = escolher excluir só esta'
-      )
+      const serieToda = await confirmar({
+        titulo: 'Excluir série recorrente?',
+        mensagem: 'Esta receita faz parte de uma série.\n"Excluir série" remove todos os lançamentos; "Só esta" remove apenas este.',
+        confirmLabel: 'Excluir série', cancelLabel: 'Só esta', perigoso: true,
+      })
       if (serieToda) {
         const { error } = await supabase.from('receitas').delete().eq('serie_id', r.serie_id)
-        if (error) { alert(`Erro: ${error.message}`); return }
-        fetchReceitas(); return
+        if (error) { toast.error(`Erro: ${error.message}`); return }
+        toast.success('Série excluída'); fetchReceitas(); return
       }
-      if (!confirm('Excluir apenas esta receita?')) return
-    } else if (!confirm('Excluir esta receita?')) return
+      if (!await confirmar({ titulo: 'Excluir só esta receita?', confirmLabel: 'Excluir', perigoso: true })) return
+    } else if (!await confirmar({ titulo: 'Excluir esta receita?', confirmLabel: 'Excluir', perigoso: true })) return
     const { error } = await supabase.from('receitas').delete().eq('id', r.id)
-    if (error) { alert(`Erro: ${error.message}`); return }
-    fetchReceitas()
+    if (error) { toast.error(`Erro: ${error.message}`); return }
+    toast.success('Receita excluída'); fetchReceitas()
   }
 
   async function handleDeleteMany(ids: string[]) {
-    if (!confirm(`Excluir ${ids.length} receita${ids.length > 1 ? 's' : ''} selecionada${ids.length > 1 ? 's' : ''}?`)) return
+    const ok = await confirmar({
+      titulo: `Excluir ${ids.length} receita${ids.length > 1 ? 's' : ''}?`,
+      mensagem: 'Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir', perigoso: true,
+    })
+    if (!ok) return
     const { error } = await supabase.from('receitas').delete().in('id', ids)
-    if (error) { alert(`Erro: ${error.message}`); return }
+    if (error) { toast.error(`Erro: ${error.message}`); return }
     setSelecionados(new Set())
+    toast.success(`${ids.length} excluída${ids.length > 1 ? 's' : ''}`)
     fetchReceitas()
   }
 

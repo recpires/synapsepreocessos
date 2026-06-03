@@ -113,7 +113,10 @@ export default function BalancoPage() {
     const desp = despesas
       .filter(d => new Date(d.data + 'T00:00:00').getMonth() === m)
       .reduce((s, d) => s + Number(d.valor), 0)
-    return { mes: MESES_LABEL[m], despesas: desp }
+    const rec = receitasDb
+      .filter(r => new Date(r.data + 'T00:00:00').getMonth() === m)
+      .reduce((s, r) => s + Number(r.valor), 0)
+    return { mes: MESES_LABEL[m], receitas: rec, despesas: desp }
   })
 
   // Por categoria
@@ -305,14 +308,16 @@ export default function BalancoPage() {
             {/* Gráficos: Por mês e Por categoria */}
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:break-inside-avoid">
               <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5 print:bg-white print:border-gray-300">
-                <h3 className="text-sm font-semibold text-white mb-4 print:text-black">Despesas por mês</h3>
+                <h3 className="text-sm font-semibold text-white mb-4 print:text-black">Receita × Despesa por mês</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={porMes}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
                     <XAxis dataKey="mes" stroke="#666" fontSize={12} />
                     <YAxis tickFormatter={fmtCompacto} stroke="#666" fontSize={12} />
                     <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="despesas" fill="#7c3aed" radius={[4, 4, 0, 0]} name="Despesas" />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="receitas" fill="#10b981" radius={[4, 4, 0, 0]} name="Receita" />
+                    <Bar dataKey="despesas" fill="#7c3aed" radius={[4, 4, 0, 0]} name="Despesa" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

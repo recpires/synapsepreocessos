@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
 import SubNav from '@/components/SubNav'
+import { toast, confirmar } from '@/components/Feedback'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Despesa,
@@ -642,24 +643,31 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
   onEdit: (d: Despesa) => void; onDuplicate: (d: Despesa) => void
   onVerAnexo: (path: string) => void; onAdd: () => void
 }) {
+  const anoCorrente = String(new Date().getFullYear())
+  const [anoFiltro, setAnoFiltro]   = useState(anoCorrente)
   const [mesFiltro, setMesFiltro]   = useState('todos')
   const [catFiltro, setCatFiltro]   = useState('Todas')
   const [tipoFiltro, setTipoFiltro] = useState('todos')
   const [busca, setBusca]           = useState('')
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
 
+  const anosDisponiveis = Array.from(new Set(despesas.map(d => d.data.slice(0, 4)))).sort().reverse()
+
   const filtradas = despesas.filter(d => {
+    const matchAno   = anoFiltro === 'todos'  || d.data.startsWith(anoFiltro)
     const matchMes   = mesFiltro === 'todos'  || d.data.startsWith(mesFiltro)
     const matchCat   = catFiltro === 'Todas'  || d.categoria === catFiltro
     const matchTipo  = tipoFiltro === 'todos' || d.tipo === tipoFiltro
     const matchBusca = !busca ||
       d.descricao.toLowerCase().includes(busca.toLowerCase()) ||
       d.produto.toLowerCase().includes(busca.toLowerCase())
-    return matchMes && matchCat && matchTipo && matchBusca
+    return matchAno && matchMes && matchCat && matchTipo && matchBusca
   })
 
   const totalFiltrado = filtradas.reduce((s, d) => s + Number(d.valor), 0)
-  const mesesDisponiveis = Array.from(new Set(despesas.map(d => d.data.slice(0, 7)))).sort().reverse()
+  const mesesDisponiveis = Array.from(new Set(
+    despesas.filter(d => anoFiltro === 'todos' || d.data.startsWith(anoFiltro)).map(d => d.data.slice(0, 7))
+  )).sort().reverse()
 
   const toggleUm = (id: string) => setSelecionados(prev => {
     const next = new Set(prev)
@@ -686,6 +694,10 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-center">
+        <select value={anoFiltro} onChange={e => { setAnoFiltro(e.target.value); setMesFiltro('todos') }} className={sel}>
+          <option value="todos">Todos os anos</option>
+          {anosDisponiveis.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
         <select value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} className={sel}>
           <option value="todos">Todos os meses</option>
           {mesesDisponiveis.map(m => {
@@ -705,8 +717,8 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
         </select>
         <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
           placeholder="Buscar…" className={`${sel} w-44 placeholder-gray-600`} />
-        {(mesFiltro !== 'todos' || catFiltro !== 'Todas' || tipoFiltro !== 'todos' || busca) && (
-          <button onClick={() => { setMesFiltro('todos'); setCatFiltro('Todas'); setTipoFiltro('todos'); setBusca('') }}
+        {(anoFiltro !== 'todos' || mesFiltro !== 'todos' || catFiltro !== 'Todas' || tipoFiltro !== 'todos' || busca) && (
+          <button onClick={() => { setAnoFiltro('todos'); setMesFiltro('todos'); setCatFiltro('Todas'); setTipoFiltro('todos'); setBusca('') }}
             className="text-xs text-gray-500 hover:text-white transition-colors">Limpar</button>
         )}
         <div className="ml-auto flex items-center gap-3">
@@ -992,7 +1004,7 @@ export default function FinanceiroPage() {
     const { data, error } = await supabase.storage
       .from('financeiro-anexos')
       .createSignedUrl(path, 120)
-    if (error || !data?.signedUrl) { alert('Não foi possível abrir o anexo.'); return }
+    if (error || !data?.signedUrl) { toast.error('Não foi possível abrir o anexo.'); return }
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
   }
 
@@ -1040,7 +1052,9 @@ export default function FinanceiroPage() {
       // Edição: altera apenas o registro atual (não regenera a série)
       const { serie_id: _s, parcela_num: _n, parcela_total: _t, ...editavel } = payload
       void _s; void _n; void _t
-      await supabase.from('despesas').update(editavel).eq('id', id)
+      const { error } = await supabase.from('despesas').update(editavel).eq('id', id)
+      if (error) { toast.error(`Erro ao salvar: ${error.message}`); return }
+      toast.success('Despesa atualizada')
     } else if (payload.recorrente && payload.periodicidade) {
       // Nova despesa recorrente → gera a série de lançamentos
       const total = payload.parcela_total ?? 12 // contínuo = janela de 12 ocorrências
@@ -1057,9 +1071,13 @@ export default function FinanceiroPage() {
         anexo_path: i === 0 ? payload.anexo_path : undefined,
         anexo_nome: i === 0 ? payload.anexo_nome : undefined,
       }))
-      await supabase.from('despesas').insert(rows)
+      const { error } = await supabase.from('despesas').insert(rows)
+      if (error) { toast.error(`Erro ao salvar: ${error.message}`); return }
+      toast.success(`${rows.length} lançamentos criados`)
     } else {
-      await supabase.from('despesas').insert(payload)
+      const { error } = await supabase.from('despesas').insert(payload)
+      if (error) { toast.error(`Erro ao salvar: ${error.message}`); return }
+      toast.success('Despesa lançada')
     }
     closeModal()
     fetchDespesas()
@@ -1067,29 +1085,35 @@ export default function FinanceiroPage() {
 
   async function handleDelete(d: Despesa) {
     if (d.serie_id) {
-      const apenasEste = confirm(
-        `Esta despesa faz parte de uma série recorrente.\n\n` +
-        `OK = excluir TODA a série\n` +
-        `Cancelar = escolher excluir só este lançamento`
-      )
-      if (apenasEste) {
+      const serieToda = await confirmar({
+        titulo: 'Excluir série recorrente?',
+        mensagem: 'Esta despesa faz parte de uma série.\n"Excluir série" remove todos os lançamentos; "Só este" remove apenas este mês.',
+        confirmLabel: 'Excluir série',
+        cancelLabel: 'Só este',
+        perigoso: true,
+      })
+      if (serieToda) {
         await supabase.from('despesas').delete().eq('serie_id', d.serie_id)
-        fetchDespesas()
-        return
+        toast.success('Série excluída'); fetchDespesas(); return
       }
-      if (!confirm('Excluir apenas este lançamento?')) return
+      if (!await confirmar({ titulo: 'Excluir só este lançamento?', confirmLabel: 'Excluir', perigoso: true })) return
       await supabase.from('despesas').delete().eq('id', d.id)
-      fetchDespesas()
-      return
+      toast.success('Lançamento excluído'); fetchDespesas(); return
     }
-    if (!confirm('Excluir esta despesa?')) return
+    if (!await confirmar({ titulo: 'Excluir esta despesa?', confirmLabel: 'Excluir', perigoso: true })) return
     await supabase.from('despesas').delete().eq('id', d.id)
-    fetchDespesas()
+    toast.success('Despesa excluída'); fetchDespesas()
   }
 
   async function handleDeleteMany(ids: string[]) {
-    if (!confirm(`Excluir ${ids.length} lançamento${ids.length > 1 ? 's' : ''} selecionado${ids.length > 1 ? 's' : ''}?`)) return
+    const ok = await confirmar({
+      titulo: `Excluir ${ids.length} lançamento${ids.length > 1 ? 's' : ''}?`,
+      mensagem: 'Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir', perigoso: true,
+    })
+    if (!ok) return
     await supabase.from('despesas').delete().in('id', ids)
+    toast.success(`${ids.length} excluído${ids.length > 1 ? 's' : ''}`)
     fetchDespesas()
   }
 
@@ -1102,6 +1126,14 @@ export default function FinanceiroPage() {
     : despesas.filter(d => d.data.startsWith(mesGlobal))
 
   const totalGeral = despesas.reduce((s, d) => s + Number(d.valor), 0)
+
+  // Alertas de vencimento — despesas a vencer nos próximos 7 dias
+  const hojeStr = new Date().toISOString().slice(0, 10)
+  const limiteStr = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
+  const aVencer = despesas
+    .filter(d => d.data >= hojeStr && d.data <= limiteStr)
+    .sort((a, b) => a.data.localeCompare(b.data))
+  const totalAVencer = aVencer.reduce((s, d) => s + Number(d.valor), 0)
 
   return (
     <PainelShell>
@@ -1158,6 +1190,26 @@ export default function FinanceiroPage() {
             </div>
           </div>
         </div>
+
+        {/* Alerta de vencimentos próximos */}
+        {!loading && aVencer.length > 0 && (
+          <div className="bg-amber-900/15 border border-amber-800/40 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm text-amber-300">
+                ⏰ <span className="font-semibold">{aVencer.length} despesa{aVencer.length > 1 ? 's' : ''} a vencer</span> nos próximos 7 dias
+                <span className="text-amber-400/70"> · {fmt(totalAVencer)}</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {aVencer.slice(0, 4).map(d => (
+                  <span key={d.id} className="text-[11px] bg-amber-900/30 text-amber-200 rounded px-2 py-0.5">
+                    {d.descricao.slice(0, 24)} · {new Date(d.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                  </span>
+                ))}
+                {aVencer.length > 4 && <span className="text-[11px] text-amber-400/70">+{aVencer.length - 4}</span>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-32 text-gray-600">Carregando…</div>
