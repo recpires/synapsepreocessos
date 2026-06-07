@@ -42,6 +42,13 @@ const PRODUTOS: Produto[] = [
     tagline: 'Plataforma premium para barbearias modernas',
     status: 'Maduro', statusCor: 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/40',
     pct: 98,
+    maturidadeBreakdown: [
+      { camada: 'App / Agendamento', pct: 99 },
+      { camada: 'Financeiro / Asaas', pct: 98 },
+      { camada: 'CRM & Fidelização', pct: 98 },
+      { camada: 'PWA / Mobile',      pct: 97 },
+      { camada: 'White-Label',       pct: 96 },
+    ],
     descCurta: 'SaaS PWA para barbearias — agendamento inteligente, caixa digital, CRM e fidelização.',
     descLonga: 'Mais do que um agendador — um ecossistema completo de gestão que transforma barbearias em negócios de alta performance. Do agendamento online ao controle financeiro, do estoque ao clube de fidelidade, o Nero oferece tudo em uma plataforma com identidade premium e suporte a white-label para franquias e redes.',
     personalidade: 'Premium · Dark · Sofisticado · Direto. A experiência visual remete ao ambiente da barbearia clássica com toques modernos — preto e ouro.',
@@ -125,6 +132,13 @@ const PRODUTOS: Produto[] = [
     tagline: 'Gestão clínica de alta performance para psicólogos',
     status: 'Atenção', statusCor: 'bg-amber-900/30 text-amber-400 border border-amber-800/40',
     pct: 65,
+    maturidadeBreakdown: [
+      { camada: 'Backend .NET',     pct: 85 },
+      { camada: 'Módulo ABA',       pct: 60 },
+      { camada: 'Segurança / LGPD', pct: 40 },
+      { camada: 'Frontend React',   pct: 30 },
+      { camada: 'Mobile',           pct: 15 },
+    ],
     descCurta: 'SaaS para psicólogos — agenda, prontuários eletrônicos e módulo ABA integrado.',
     descLonga: 'Plataforma clínica focada em Análise do Comportamento Aplicado (ABA) e produtividade do psicólogo. Prontuário eletrônico com assinatura digital, agenda com controle de salas, financeiro por profissional e suporte a clínicas multidisciplinares. v2.1.0 com protocolos ABA completos em produção.',
     personalidade: 'Acolhedor · Científico · Claro. A experiência é serena — azul-marinho e teal transmitem confiança e cuidado sem frieza corporativa.',
@@ -208,6 +222,13 @@ const PRODUTOS: Produto[] = [
     tagline: 'CRM B2B para agências brasileiras — simples de entender, poderoso para crescer',
     status: 'Em dev', statusCor: 'bg-blue-900/30 text-blue-400 border border-blue-800/40',
     pct: 40,
+    maturidadeBreakdown: [
+      { camada: 'Core CRM / Pipeline', pct: 60 },
+      { camada: 'Backend .NET / API',  pct: 50 },
+      { camada: 'WhatsApp / Integrações', pct: 30 },
+      { camada: 'Segurança / Auditoria',  pct: 15 },
+      { camada: 'Testes / QA',            pct: 10 },
+    ],
     descCurta: 'CRM próprio da Synapse Code — gestão de leads, pipeline kanban, WhatsApp e propostas digitais.',
     descLonga: 'CRM B2B focado em agências de marketing brasileiras. Preenche o gap entre o RD Station fraco e o HubSpot caro — com preço acessível para o mercado brasileiro. Pipeline kanban drag-and-drop, integração WhatsApp (Evolution API), propostas com assinatura digital, financeiro com Asaas, automações e white-label. Lançamento: 31 de julho de 2026.',
     personalidade: 'Profissional · Conectado · Crescimento. Indigo e emerald transmitem confiança e conversão — uma ferramenta séria com UX moderna.',
@@ -302,6 +323,13 @@ const PRODUTOS: Produto[] = [
     tagline: 'Gestão de obras para engenheiros e construtoras — do canteiro ao financeiro',
     status: 'Atenção', statusCor: 'bg-amber-900/30 text-amber-400 border border-amber-800/40',
     pct: 45,
+    maturidadeBreakdown: [
+      { camada: 'Frontend',            pct: 70 },
+      { camada: 'Backend Fastify',     pct: 65 },
+      { camada: 'Módulo Financeiro',   pct: 50 },
+      { camada: 'SST / Pessoal',       pct: 35 },
+      { camada: 'Compliance BR',       pct: 20 },
+    ],
     descCurta: 'SaaS para engenharia civil — gestão de obras, custos, equipes e suprimentos.',
     descLonga: 'Plataforma de gestão para empreiteiros e construtoras de pequeno e médio porte. Única plataforma brasileira que une engenharia, financeiro, pessoal e suprimentos em um sistema só. Do RDO digital ao fluxo de caixa, do cronograma à Curva S — sem planilhas, sem papel, sem perder obra por falta de controle.',
     personalidade: 'Industrial brutalist · Direto · Técnico · Sem frescura corporativa. Amarelo de capacete e preto concreto — o contraste máximo para ambientes de obra.',
@@ -389,6 +417,13 @@ const PRODUTOS: Produto[] = [
     tagline: 'Novo SaaS em concepção — setor e escopo a definir',
     status: 'Novo', statusCor: 'bg-violet-900/30 text-violet-400 border border-violet-800/40',
     pct: 15,
+    maturidadeBreakdown: [
+      { camada: 'Pagamentos',      pct: 65 },
+      { camada: 'Quiz / Onboarding', pct: 60 },
+      { camada: 'Jornada 30 dias', pct: 10 },
+      { camada: 'Comunidade',      pct: 5  },
+      { camada: 'Mobile / App',    pct: 5  },
+    ],
     descCurta: 'Produto em fase inicial de descoberta e definição de mercado.',
     descLonga: 'Produto em fase de descoberta. Setor, ICP e funcionalidades ainda em definição. Stack e identidade visual serão definidas após validação do problema de mercado.',
     personalidade: 'A definir após validação do mercado-alvo.',
@@ -1040,16 +1075,16 @@ export default function ProdutosPage() {
                 </div>
                 {produto.maturidadeBreakdown && (
                   <div className="mt-3 space-y-1.5">
-                    {produto.maturidadeBreakdown.map(({ camada, pct }) => (
+                    {produto.maturidadeBreakdown.map(({ camada, pct: cpct }) => (
                       <div key={camada}>
                         <div className="flex justify-between text-[10px] text-gray-600 mb-0.5">
                           <span>{camada}</span>
-                          <span>{pct}%</span>
+                          <span>{cpct}%</span>
                         </div>
                         <div className="h-1 bg-[#1e1e2e] rounded-full overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-cyan-600/60 transition-all"
-                            style={{ width: `${pct}%` }}
+                            className="h-full rounded-full bg-gradient-to-r from-violet-700/50 to-violet-500/50 transition-all"
+                            style={{ width: `${cpct}%` }}
                           />
                         </div>
                       </div>
