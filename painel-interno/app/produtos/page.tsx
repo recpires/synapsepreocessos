@@ -19,9 +19,12 @@ interface Plano  { nome: string; preco: string; periodicidade?: string; usuarios
 interface Doc    { tipo: 'readme' | 'licença' | 'segurança' | 'identidade' | 'contrato' | 'qa' | 'deploy'; titulo: string; desc: string; arquivo?: string }
 interface ICP    { perfil: string; dor: string; gatilho: string; canal: string }
 
+interface MaturidadeCamada { camada: string; pct: number }
+
 interface Produto {
   id: string; icon: string; nome: string; tagline: string
   status: string; statusCor: string; pct: number
+  maturidadeBreakdown?: MaturidadeCamada[]
   descCurta: string; descLonga: string
   personalidade: string
   cores: Cor[]; fontes: Fonte[]
@@ -430,6 +433,13 @@ const PRODUTOS: Produto[] = [
     tagline: 'a IA que atende com você',
     status: 'Beta', statusCor: 'bg-cyan-900/30 text-cyan-400 border border-cyan-800/40',
     pct: 90,
+    maturidadeBreakdown: [
+      { camada: 'Motor RAG',    pct: 95 },
+      { camada: 'App / Dashboard', pct: 95 },
+      { camada: 'Widget',       pct: 90 },
+      { camada: 'WhatsApp',     pct: 85 },
+      { camada: 'Billing',      pct: 75 },
+    ],
     descCurta: 'SaaS multi-tenant de atendimento com IA — agentes RAG incorporáveis em qualquer site e no WhatsApp, com gate anti-alucinação.',
     descLonga: 'Plataforma de IA conversacional estilo MagicForm.AI, de uso interno da Synapse Code. Agentes treinados no conteúdo do cliente via RAG (pgvector + Voyage AI + Claude), widget incorporável em qualquer site com Shadow DOM e canal WhatsApp via Evolution API. Gate anti-alucinação como valor central: se não sabe, diz que não sabe e oferece um humano. Multi-tenancy com RLS fail-closed, dashboard data-dense, landing page e cobrança via Stripe. Todos os 10 milestones concluídos — pendente: migração Stripe → Asaas e keys de produção.',
     personalidade: 'Claro · Caloroso · Anti-alucinação. lum de luz + IA — a IA que ilumina o atendimento. Verde `#9fff00` como acento, azul `#2563EB` como primária no app. Tom informal-profissional, pt-BR.',
@@ -1028,6 +1038,24 @@ export default function ProdutosPage() {
                     style={{ width: `${produto.pct}%` }}
                   />
                 </div>
+                {produto.maturidadeBreakdown && (
+                  <div className="mt-3 space-y-1.5">
+                    {produto.maturidadeBreakdown.map(({ camada, pct }) => (
+                      <div key={camada}>
+                        <div className="flex justify-between text-[10px] text-gray-600 mb-0.5">
+                          <span>{camada}</span>
+                          <span>{pct}%</span>
+                        </div>
+                        <div className="h-1 bg-[#1e1e2e] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-cyan-600/60 transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <p className="text-gray-400 text-sm mt-4 leading-relaxed max-w-3xl">{produto.descLonga}</p>
