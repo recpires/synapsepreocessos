@@ -422,6 +422,90 @@ const PRODUTOS: Produto[] = [
       canal:    'A definir.',
     },
   },
+
+  /* ══════════════════════════════ LUMIA ══════════════════════════════ */
+  {
+    id: 'lumia',
+    icon: '✨', nome: 'lumIA',
+    tagline: 'a IA que atende com você',
+    status: 'Beta', statusCor: 'bg-cyan-900/30 text-cyan-400 border border-cyan-800/40',
+    pct: 90,
+    descCurta: 'SaaS multi-tenant de atendimento com IA — agentes RAG incorporáveis em qualquer site e no WhatsApp, com gate anti-alucinação.',
+    descLonga: 'Plataforma de IA conversacional estilo MagicForm.AI, de uso interno da Synapse Code. Agentes treinados no conteúdo do cliente via RAG (pgvector + Voyage AI + Claude), widget incorporável em qualquer site com Shadow DOM e canal WhatsApp via Evolution API. Gate anti-alucinação como valor central: se não sabe, diz que não sabe e oferece um humano. Multi-tenancy com RLS fail-closed, dashboard data-dense, landing page e cobrança via Stripe. Todos os 10 milestones concluídos — pendente: migração Stripe → Asaas e keys de produção.',
+    personalidade: 'Claro · Caloroso · Anti-alucinação. lum de luz + IA — a IA que ilumina o atendimento. Verde `#9fff00` como acento, azul `#2563EB` como primária no app. Tom informal-profissional, pt-BR.',
+
+    cores: [
+      { nome: 'Verde de Marca', hex: '#9fff00', uso: 'Acento decorativo — ponto do ícone, seleção de texto (nunca para texto sobre claro)' },
+      { nome: 'Azul Primário',  hex: '#2563EB', uso: 'Ações, "IA" no wordmark (app), links' },
+      { nome: 'CTA Orange',     hex: '#f97316', uso: 'Destaque pontual — call-to-action secundário' },
+      { nome: 'Base Marketing', hex: '#EDEEF5', uso: 'Fundo da landing page' },
+      { nome: 'Tinta',          hex: '#1a1a1a', uso: 'Texto principal, símbolo no claro' },
+    ],
+    fontes: [
+      { papel: 'Display / Títulos (marketing)', familia: 'Outfit',    peso: '600–700' },
+      { papel: 'Texto (marketing)',              familia: 'Inter',     peso: '400–500' },
+      { papel: 'UI / Dashboard',                familia: 'Fira Sans', peso: '400–600' },
+      { papel: 'Código / números tabulares',    familia: 'Fira Code', peso: '400' },
+    ],
+
+    features: [
+      { titulo: 'Motor RAG com Anti-alucinação', desc: 'Embedding → kNN cosseno pgvector (HNSW) → gate anti-alucinação → Claude streaming com citações. Se abaixo do limiar, fallback sem LLM.' },
+      { titulo: 'Widget Incorporável',            desc: 'JS puro com Shadow DOM + iframe isolado. Setup de ~10 min em qualquer site (Shopify, WordPress, Webflow). Assina "Desenvolvido com lumIA" (ocultável no plano white-label).' },
+      { titulo: 'Canal WhatsApp',                desc: 'Evolution API — pareamento por QR em Canais → WhatsApp. Mesmo motor RAG compartilhado com o widget.' },
+      { titulo: 'Ingestão de Conhecimento',      desc: 'Crawler de site (sitemap + BFS mesma-origem + cheerio) ou upload de texto. Chunking, embedding Voyage AI e indexação pgvector em background.' },
+      { titulo: 'Multi-tenancy + RLS',           desc: 'Toda linha escopada por org_id. withOrg() define GUC de RLS por transação + RLS PostgreSQL fail-closed. App conecta como app_role (não-superusuário).' },
+      { titulo: 'Dashboard & Métricas',          desc: 'Dashboard data-dense com contadores de uso mensais, histórico de conversas, gestão de agentes e fontes de conhecimento.' },
+    ],
+
+    stack: [
+      { label: 'Next.js 15 (App Router)', categoria: 'frontend' },
+      { label: 'TypeScript',              categoria: 'frontend' },
+      { label: 'Tailwind v4',             categoria: 'frontend' },
+      { label: 'shadcn/ui',               categoria: 'frontend' },
+      { label: 'PostgreSQL 16 + pgvector',categoria: 'backend' },
+      { label: 'Drizzle ORM',             categoria: 'backend' },
+      { label: 'Auth.js v5',              categoria: 'backend' },
+      { label: 'Anthropic Claude',        categoria: 'integração' },
+      { label: 'Voyage AI (embeddings)',  categoria: 'integração' },
+      { label: 'Stripe (→ Asaas)',        categoria: 'integração' },
+      { label: 'Evolution API (WA)',      categoria: 'integração' },
+      { label: 'Vercel',                  categoria: 'infra' },
+      { label: 'Docker (local)',          categoria: 'infra' },
+    ],
+
+    planos: [
+      {
+        nome: 'Starter', preco: 'R$147', periodicidade: '/mês',
+        usuarios: '1 agente',
+        features: ['Widget incorporável', 'Canal WhatsApp', 'Ingestão de site + texto', 'Dashboard de métricas'],
+      },
+      {
+        nome: 'Pro ⭐', preco: 'R$297', periodicidade: '/mês',
+        usuarios: 'Até 3 agentes', destaque: true,
+        features: ['Tudo do Starter', 'Múltiplos agentes', 'Histórico completo', 'Metering de mensagens'],
+      },
+      {
+        nome: 'Business', preco: 'R$1.197', periodicidade: '/mês',
+        usuarios: 'Agentes ilimitados',
+        features: ['Tudo do Pro', 'White-label (oculta "Desenvolvido com lumIA")', 'Suporte prioritário', 'SLA dedicado'],
+      },
+    ],
+
+    docs: [
+      { tipo: 'readme',     titulo: 'README',           desc: 'Stack, milestones, scripts de setup e instruções de deploy.',      arquivo: 'README.md' },
+      { tipo: 'identidade', titulo: 'Identidade Visual',desc: 'Brand book: wordmark lumIA, spark icon, cores, tipografia e tom.', arquivo: 'IDENTITY.md' },
+      { tipo: 'segurança',  titulo: 'Security Policy',  desc: 'Divulgação responsável e diretrizes de segurança.',               arquivo: 'SECURITY.md' },
+      { tipo: 'deploy',     titulo: 'Deploy Guide',     desc: 'Deploy Vercel + Neon/Supabase, variáveis de ambiente e Evolution API.', arquivo: 'DEPLOY.md' },
+    ],
+
+    icp: {
+      perfil:   'Empresa com site próprio que recebe dúvidas repetitivas de clientes e quer automatizar o atendimento sem perder a qualidade.',
+      dor:      'Equipe sobrecarregada respondendo as mesmas perguntas. Sem resposta fora do horário comercial. Leads perdidos por demora no retorno.',
+      gatilho:  '"Preciso atender no WhatsApp fora do horário" ou "meu time gasta horas respondendo FAQ".',
+      canal:    'LinkedIn (donos de e-commerce, agências, gestores de atendimento), indicação, Instagram.',
+    },
+    url: 'https://lumia-theta-nine.vercel.app',
+  },
 ]
 
 /* ─── Helpers de estilo ──────────────────────────────────────── */
@@ -878,7 +962,7 @@ export default function ProdutosPage() {
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500 bg-[#111118] border border-[#1e1e2e] rounded-lg px-3 py-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-            1 maduro (98%) · 2 em atenção · 1 em dev · 1 novo
+            1 maduro (98%) · 2 em atenção · 1 em dev · 1 beta · 1 novo
           </div>
         </div>
 
