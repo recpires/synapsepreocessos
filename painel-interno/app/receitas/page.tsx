@@ -34,6 +34,31 @@ const FILTRO_RECEITA_INICIAL: FiltrosReceita = {
   busca: '', produto: 'Todos', origem: 'Todos', status: 'Todos', categoria: 'Todas',
 }
 
+// Colunas da tabela de receitas. `campo` null = não ordenável (ações).
+type SortCampoReceita = 'data' | 'descricao' | 'produto' | 'cliente' | 'valor' | 'forma_pagamento' | 'tipo' | 'status' | 'origem'
+type SortReceita = { campo: SortCampoReceita; dir: 'asc' | 'desc' }
+const SORT_RECEITA_INICIAL: SortReceita = { campo: 'data', dir: 'desc' }
+
+const COLUNAS_RECEITA: { label: string; campo: SortCampoReceita | null }[] = [
+  { label: 'Data',      campo: 'data' },
+  { label: 'Descrição', campo: 'descricao' },
+  { label: 'Produto',   campo: 'produto' },
+  { label: 'Cliente',   campo: 'cliente' },
+  { label: 'Valor',     campo: 'valor' },
+  { label: 'Forma',     campo: 'forma_pagamento' },
+  { label: 'Tipo',      campo: 'tipo' },
+  { label: 'Status',    campo: 'status' },
+  { label: 'Origem',    campo: 'origem' },
+  { label: '',          campo: null },
+]
+
+// Valor usado na ordenação — número para 'valor', string para o resto (cliente cai no id).
+function valorOrdenacaoReceita(r: Receita, campo: SortCampoReceita): string | number {
+  if (campo === 'valor')   return Number(r.valor)
+  if (campo === 'cliente') return r.cliente ?? r.cliente_id ?? ''
+  return r[campo] ?? ''
+}
+
 function addPeriodo(dataISO: string, periodicidade: string, n: number): string {
   const [y, m, d] = dataISO.split('-').map(Number)
   if (periodicidade === 'Semanal' || periodicidade === 'Quinzenal') {
@@ -301,6 +326,14 @@ export default function ReceitasPage() {
   const [f, setF] = usePersistido<FiltrosReceita>('financeiro:filtros-receitas', FILTRO_RECEITA_INICIAL)
   const upd = (patch: Partial<FiltrosReceita>) => setF({ ...f, ...patch })
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [sort, setSort] = usePersistido<SortReceita>('financeiro:sort-receitas', SORT_RECEITA_INICIAL)
+
+  // Clicar na coluna ativa alterna asc/desc; em coluna nova, datas e valores
+  // começam em desc (mais recente / maior primeiro), texto em asc (A→Z).
+  const toggleSort = (campo: SortCampoReceita) =>
+    setSort(sort.campo === campo
+      ? { campo, dir: sort.dir === 'asc' ? 'desc' : 'asc' }
+      : { campo, dir: campo === 'data' || campo === 'valor' ? 'desc' : 'asc' })
 
   const fetchReceitas = useCallback(async () => {
     setLoading(true)
@@ -408,6 +441,15 @@ export default function ReceitasPage() {
     return matchPeriodo && matchBusca && matchProduto && matchOrigem && matchStatus && matchCat
   })
   const filtroAtivo = f.preset !== 'ano-atual' || f.busca || f.produto !== 'Todos' || f.origem !== 'Todos' || f.status !== 'Todos' || f.categoria !== 'Todas'
+
+  const ordenadas = [...filtradas].sort((a, b) => {
+    const va = valorOrdenacaoReceita(a, sort.campo)
+    const vb = valorOrdenacaoReceita(b, sort.campo)
+    const cmp = typeof va === 'number' && typeof vb === 'number'
+      ? va - vb
+      : String(va).localeCompare(String(vb), 'pt-BR')
+    return sort.dir === 'asc' ? cmp : -cmp
+  })
 
   // Seleção múltipla
   const toggleUm = (id: string) => setSelecionados(prev => {
@@ -565,15 +607,29 @@ export default function ReceitasPage() {
                       <input type="checkbox" checked={todosMarcados} onChange={toggleTodos}
                         title="Selecionar todas" className="w-4 h-4 accent-violet-600 cursor-pointer align-middle" />
                     </th>
-                    {['Data','Descrição','Produto','Cliente','Valor','Forma','Tipo','Status','Origem',''].map(h => (
-                      <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap">{h}</th>
+                    {COLUNAS_RECEITA.map((col, idx) => (
+                      <th key={col.label || `acoes-${idx}`}
+                        className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap">
+                        {col.campo ? (
+                          <button onClick={() => toggleSort(col.campo!)}
+                            title={`Ordenar por ${col.label}`}
+                            className={`inline-flex items-center gap-1 transition-colors hover:text-gray-300 ${
+                              sort.campo === col.campo ? 'text-violet-400' : ''
+                            }`}>
+                            <span>{col.label}</span>
+                            <span className={`text-[10px] leading-none ${sort.campo === col.campo ? '' : 'text-gray-700'}`}>
+                              {sort.campo === col.campo ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                            </span>
+                          </button>
+                        ) : col.label}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtradas.map((r, i) => (
+                  {ordenadas.map((r, i) => (
                     <tr key={r.id}
-                      className={`border-b border-[#1e1e2e]/60 transition-colors ${i === filtradas.length - 1 ? 'border-b-0' : ''} ${
+                      className={`border-b border-[#1e1e2e]/60 transition-colors ${i === ordenadas.length - 1 ? 'border-b-0' : ''} ${
                         selecionados.has(r.id) ? 'bg-violet-900/20' : 'hover:bg-[#1e1e2e]/40'
                       }`}>
                       <td className="px-4 py-3">

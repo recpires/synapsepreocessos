@@ -112,6 +112,23 @@ const FILTRO_DESPESA_INICIAL: FiltrosDespesa = {
   categoria: 'Todas', tipo: 'todos', produto: 'Todos', busca: '',
 }
 
+// Colunas da tabela de despesas. `campo` null = não ordenável (anexo / ações).
+type SortCampoDespesa = 'data' | 'descricao' | 'categoria' | 'produto' | 'forma_pagamento' | 'tipo' | 'valor'
+type SortDespesa = { campo: SortCampoDespesa; dir: 'asc' | 'desc' }
+const SORT_DESPESA_INICIAL: SortDespesa = { campo: 'data', dir: 'desc' }
+
+const COLUNAS_DESPESA: { label: string; campo: SortCampoDespesa | null; align?: 'right' }[] = [
+  { label: 'Data',      campo: 'data' },
+  { label: 'Descrição', campo: 'descricao' },
+  { label: 'Categoria', campo: 'categoria' },
+  { label: 'Produto',   campo: 'produto' },
+  { label: 'Forma',     campo: 'forma_pagamento' },
+  { label: 'Tipo',      campo: 'tipo' },
+  { label: 'Valor',     campo: 'valor', align: 'right' },
+  { label: '📎',         campo: null },
+  { label: '',          campo: null },
+]
+
 const EMPTY_FORM: DespesaInsert = {
   data: new Date().toISOString().split('T')[0],
   descricao: '',
@@ -656,6 +673,14 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
   const [f, setF] = usePersistido<FiltrosDespesa>('financeiro:filtros-despesas', FILTRO_DESPESA_INICIAL)
   const upd = (patch: Partial<FiltrosDespesa>) => setF({ ...f, ...patch })
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [sort, setSort] = usePersistido<SortDespesa>('financeiro:sort-despesas', SORT_DESPESA_INICIAL)
+
+  // Clicar na coluna ativa alterna asc/desc; em coluna nova, datas e valores
+  // começam em desc (mais recente / maior primeiro), texto em asc (A→Z).
+  const toggleSort = (campo: SortCampoDespesa) =>
+    setSort(sort.campo === campo
+      ? { campo, dir: sort.dir === 'asc' ? 'desc' : 'asc' }
+      : { campo, dir: campo === 'data' || campo === 'valor' ? 'desc' : 'asc' })
 
   const { de, ate } = rangePeriodo(f.preset, f.de, f.ate)
 
@@ -668,6 +693,13 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
       d.descricao.toLowerCase().includes(f.busca.toLowerCase()) ||
       d.produto.toLowerCase().includes(f.busca.toLowerCase())
     return matchPeriodo && matchCat && matchTipo && matchProduto && matchBusca
+  })
+
+  const ordenadas = [...filtradas].sort((a, b) => {
+    const cmp = sort.campo === 'valor'
+      ? Number(a.valor) - Number(b.valor)
+      : String(a[sort.campo] ?? '').localeCompare(String(b[sort.campo] ?? ''), 'pt-BR')
+    return sort.dir === 'asc' ? cmp : -cmp
   })
 
   const totalFiltrado = filtradas.reduce((s, d) => s + Number(d.valor), 0)
@@ -771,15 +803,29 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
                     <input type="checkbox" checked={todosMarcados} onChange={toggleTodos}
                       title="Selecionar todos" className="w-4 h-4 accent-violet-600 cursor-pointer align-middle" />
                   </th>
-                  {['Data','Descrição','Categoria','Produto','Forma','Tipo','Valor','📎',''].map(h => (
-                    <th key={h} className="text-left text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap">{h}</th>
+                  {COLUNAS_DESPESA.map((col, idx) => (
+                    <th key={col.label || `acoes-${idx}`}
+                      className={`text-xs text-gray-500 font-medium px-4 py-3 whitespace-nowrap ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                      {col.campo ? (
+                        <button onClick={() => toggleSort(col.campo!)}
+                          title={`Ordenar por ${col.label}`}
+                          className={`inline-flex items-center gap-1 transition-colors hover:text-gray-300 ${
+                            col.align === 'right' ? 'flex-row-reverse' : ''
+                          } ${sort.campo === col.campo ? 'text-violet-400' : ''}`}>
+                          <span>{col.label}</span>
+                          <span className={`text-[10px] leading-none ${sort.campo === col.campo ? '' : 'text-gray-700'}`}>
+                            {sort.campo === col.campo ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </button>
+                      ) : col.label}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtradas.map((d, i) => (
+                {ordenadas.map((d, i) => (
                   <tr key={d.id}
-                    className={`border-b border-[#1e1e2e]/60 transition-colors ${i === filtradas.length - 1 ? 'border-b-0' : ''} ${
+                    className={`border-b border-[#1e1e2e]/60 transition-colors ${i === ordenadas.length - 1 ? 'border-b-0' : ''} ${
                       selecionados.has(d.id) ? 'bg-violet-900/20' : 'hover:bg-[#1e1e2e]/40'
                     }`}>
                     <td className="px-4 py-3">
