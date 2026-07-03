@@ -125,12 +125,102 @@ const PRODUTOS: Produto[] = [
     url: 'https://nerobarber.com.br',
   },
 
+  /* ══════════════════════════════ FINANÇA A DOIS ══════════════════════════════ */
+  {
+    id: 'financa-a-dois',
+    icon: '💳', nome: 'Finança a Dois',
+    tagline: 'Finanças compartilhadas para casais — sem brigas no fim do mês',
+    status: 'Beta', statusCor: 'bg-cyan-900/30 text-cyan-400 border border-cyan-800/40',
+    pct: 92,
+    maturidadeBreakdown: [
+      { camada: 'App / Dashboard',            pct: 95 },
+      { camada: 'Transações & Recorrentes',   pct: 94 },
+      { camada: 'Patrimônio & Investimentos', pct: 90 },
+      { camada: 'IA de Economia',             pct: 88 },
+      { camada: 'Billing / Asaas',            pct: 88 },
+      { camada: 'Assessoria (B2B2C)',         pct: 82 },
+    ],
+    descCurta: 'SaaS de finanças para casais — conta conjunta, metas compartilhadas, patrimônio e uma IA que sugere onde economizar.',
+    descLonga: 'Workspace financeiro compartilhado onde cada casal é um tenant: conta conjunta, receitas e despesas, gastos fixos e parcelados, lista de mercado, contas, cartões, dívidas e metas. Vai além do dia a dia com gestor de patrimônio (net worth, alocação alvo × atual, simulador FIRE, bola de neve × avalanche, benchmark CDI/IPCA), termômetro financeiro 0–100, projeção de orçamento de 12 meses e uma IA que analisa os gastos e sugere cortes. Modelo B2B2C com assessoria: um assessor parceiro acompanha o casal mediante consentimento. Trial de 14 dias, assinaturas via Asaas e PWA instalável.',
+    personalidade: 'Confiável · Acessível · Colaborativo. Dois perfis que se entrelaçam formando um coração com cifrão — azul rico transmite segurança financeira, turquesa vibrante traz inovação e energia. Dark mode com glassmorphism, tom próximo e sem juridiquês.',
+
+    cores: [
+      { nome: 'Azul Rico',          hex: '#111A31', uso: 'Títulos, botões primários, ícones principais' },
+      { nome: 'Turquesa Vibrante',  hex: '#2DC2A1', uso: 'Destaques, ações secundárias, gráficos' },
+      { nome: 'Branco Puro',        hex: '#FFFFFF', uso: 'Fundos e texto sobre superfícies escuras' },
+      { nome: 'Cinza Médio',        hex: '#757575', uso: 'Texto secundário e ícones de interface' },
+      { nome: 'Cinza Claro',        hex: '#F5F5F5', uso: 'Fundos de seção e divisores' },
+    ],
+    fontes: [
+      { papel: 'Títulos / Marca', familia: 'Poppins', peso: '500–700' },
+      { papel: 'UI / Corpo',      familia: 'Poppins', peso: '400' },
+    ],
+
+    features: [
+      { titulo: 'Dashboard do Casal',        desc: 'Saldo consolidado, receitas × despesas (6 meses), gastos por categoria, cotações (dólar/euro/BTC/Ibovespa) e regime competência/caixa.' },
+      { titulo: 'Transações & Recorrentes',  desc: 'CRUD com filtros e busca, anexo de comprovante, import OFX/CSV, gastos fixos e parcelados materializados por cron.' },
+      { titulo: 'Contas, Cartões & Dívidas', desc: 'Cartão de crédito (disponível = limite − fatura), vale-alimentação/refeição, saldo devedor, parcelas e % quitado.' },
+      { titulo: 'Gestor de Patrimônio',      desc: 'Net worth, alocação alvo × atual, reserva, simulador FIRE, plano de quitação (bola de neve × avalanche) e Carta do Gestor (IA).' },
+      { titulo: 'IA de Economia',            desc: 'Analisa os gastos do casal e sugere cortes; termômetro financeiro 0–100 e projeção de orçamento de 12 meses à frente.' },
+      { titulo: 'Assessoria (B2B2C)',        desc: 'Assessor parceiro acompanha o casal com consentimento; painel admin com MRR/ARR/churn e aprovação de assessores.' },
+    ],
+
+    stack: [
+      { label: 'Next.js 15 (App Router)', categoria: 'frontend' },
+      { label: 'TypeScript',              categoria: 'frontend' },
+      { label: 'TailwindCSS',             categoria: 'frontend' },
+      { label: 'Recharts',                categoria: 'frontend' },
+      { label: 'Supabase (Postgres+RLS)', categoria: 'backend' },
+      { label: 'Supabase Auth',           categoria: 'backend' },
+      { label: 'Server Actions',          categoria: 'backend' },
+      { label: 'Anthropic / OpenAI',      categoria: 'integração' },
+      { label: 'Asaas (pagamentos)',      categoria: 'integração' },
+      { label: 'Resend (e-mail)',         categoria: 'integração' },
+      { label: 'AwesomeAPI / BCB',        categoria: 'integração' },
+      { label: 'PWA + Capacitor',         categoria: 'infra' },
+      { label: 'Vercel',                  categoria: 'infra' },
+    ],
+
+    planos: [
+      {
+        nome: 'Grátis', preco: 'R$0', periodicidade: ' sempre',
+        usuarios: '1 conta conjunta',
+        features: ['Receitas e despesas ilimitadas', 'Dashboard básico', '1 meta ativa'],
+      },
+      {
+        nome: 'Casal', preco: 'R$19,90', periodicidade: '/mês', destaque: true,
+        usuarios: 'O casal completo',
+        features: ['Contas e cartões ilimitados', 'Vale-alimentação e carteiras', 'Metas ilimitadas + prioridades', 'Dashboard interativo completo', 'Sugestões da IA (10/mês)'],
+      },
+      {
+        nome: 'Premium', preco: 'R$29,90', periodicidade: '/mês',
+        usuarios: 'Casais que querem ir além',
+        features: ['Tudo do plano Casal', 'IA ilimitada de economia', 'Relatórios e exportação', 'Prioridades avançado', 'Suporte prioritário', '+ add-on de Assessoria'],
+      },
+    ],
+
+    docs: [
+      { tipo: 'readme',     titulo: 'README',              desc: 'Visão geral, funcionalidades, stack e estrutura do projeto.',          arquivo: 'README.md' },
+      { tipo: 'identidade', titulo: 'Identidade Visual',   desc: 'Logo, paleta (Azul Rico / Turquesa), tipografia Poppins e tom.',       arquivo: 'docs/IDENTY.md' },
+      { tipo: 'segurança',  titulo: 'Security Policy',     desc: 'RLS multi-tenant, isolamento da assessoria, webhooks e cron por token.', arquivo: 'SECURITY.md' },
+      { tipo: 'deploy',     titulo: 'Guia de Setup',       desc: 'Passo a passo de instalação, variáveis de ambiente e migrações.',      arquivo: 'SETUP.md' },
+      { tipo: 'qa',         titulo: 'Base de Conhecimento', desc: 'FAQ, objeções e recursos para vendas e suporte.',                     arquivo: 'docs/base-conhecimento/' },
+    ],
+
+    icp: {
+      perfil:   'Casais (namoro, noivado ou casados) que dividem contas — 25–45 anos, renda combinada R$4k–20k/mês.',
+      dor:      'Brigam no fim do mês por falta de visão compartilhada, controlam em planilhas separadas e não sabem para onde vai o dinheiro do casal.',
+      gatilho:  '"Vamos casar / morar juntos e precisamos organizar as contas" ou "brigamos por dinheiro todo mês".',
+      canal:    'Instagram / TikTok (finanças de casais), indicação e assessores financeiros parceiros (B2B2C).',
+    },
+  },
+
   /* ══════════════════════════════ PSI AURA ══════════════════════════════ */
   {
     id: 'psi-aura',
     icon: '🧠', nome: 'Psi Aura',
     tagline: 'Gestão clínica de alta performance para psicólogos',
-    status: 'Atenção', statusCor: 'bg-amber-900/30 text-amber-400 border border-amber-800/40',
+    status: 'Em pausa', statusCor: 'bg-slate-800/40 text-slate-400 border border-slate-700/50',
     pct: 65,
     maturidadeBreakdown: [
       { camada: 'Backend .NET',     pct: 85 },
@@ -220,7 +310,7 @@ const PRODUTOS: Produto[] = [
     id: 'crm-nexio',
     icon: '📊', nome: 'CRM Nexio',
     tagline: 'CRM B2B para agências brasileiras — simples de entender, poderoso para crescer',
-    status: 'Em dev', statusCor: 'bg-blue-900/30 text-blue-400 border border-blue-800/40',
+    status: 'Em pausa', statusCor: 'bg-slate-800/40 text-slate-400 border border-slate-700/50',
     pct: 40,
     maturidadeBreakdown: [
       { camada: 'Core CRM / Pipeline', pct: 60 },
@@ -321,7 +411,7 @@ const PRODUTOS: Produto[] = [
     id: 'kubic-eng',
     icon: '🏗️', nome: 'Kubic Eng',
     tagline: 'Gestão de obras para engenheiros e construtoras — do canteiro ao financeiro',
-    status: 'Atenção', statusCor: 'bg-amber-900/30 text-amber-400 border border-amber-800/40',
+    status: 'Em pausa', statusCor: 'bg-slate-800/40 text-slate-400 border border-slate-700/50',
     pct: 45,
     maturidadeBreakdown: [
       { camada: 'Frontend',            pct: 70 },
@@ -415,7 +505,7 @@ const PRODUTOS: Produto[] = [
     id: 'arquetipos',
     icon: '🌀', nome: 'Arquetipos App',
     tagline: 'Novo SaaS em concepção — setor e escopo a definir',
-    status: 'Novo', statusCor: 'bg-violet-900/30 text-violet-400 border border-violet-800/40',
+    status: 'Em pausa', statusCor: 'bg-slate-800/40 text-slate-400 border border-slate-700/50',
     pct: 15,
     maturidadeBreakdown: [
       { camada: 'Pagamentos',      pct: 65 },
@@ -552,6 +642,10 @@ const PRODUTOS: Produto[] = [
     url: 'https://lumia-theta-nine.vercel.app',
   },
 ]
+
+/* Ordem de exibição: produtos ativos primeiro, depois os em pausa. */
+const ORDEM_PRODUTOS = ['nero-barber', 'lumia', 'financa-a-dois', 'psi-aura', 'kubic-eng', 'crm-nexio', 'arquetipos']
+PRODUTOS.sort((a, b) => ORDEM_PRODUTOS.indexOf(a.id) - ORDEM_PRODUTOS.indexOf(b.id))
 
 /* ─── Helpers de estilo ──────────────────────────────────────── */
 const CATEGORIA_COR: Record<Tech['categoria'], string> = {
@@ -1007,7 +1101,7 @@ export default function ProdutosPage() {
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500 bg-[#111118] border border-[#1e1e2e] rounded-lg px-3 py-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-            1 maduro (98%) · 2 em atenção · 1 em dev · 1 beta · 1 novo
+            3 ativos: Nero (98%) · lumIA (90%) · Finança a Dois (92%) — 4 em pausa
           </div>
         </div>
 
