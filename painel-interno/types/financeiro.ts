@@ -21,6 +21,8 @@ export type Despesa = {
   internacional?: boolean
   taxa_pct?: number | null
   valor_base?: number | null
+  // false = assinatura cancelada; o cron de renovação ignora séries inativas
+  assinatura_ativa?: boolean
   created_at: string
   created_by: string
 }

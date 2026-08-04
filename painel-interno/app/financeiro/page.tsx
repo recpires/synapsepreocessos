@@ -170,20 +170,24 @@ function despesaToForm(d: Despesa, opts?: { duplicar?: boolean }): DespesaInsert
   }
 }
 
-function ModalDespesa({ open, editing, duplicando, onClose, onSave }: {
+function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAssinatura }: {
   open: boolean
   editing: Despesa | null
   duplicando: Despesa | null
   onClose: () => void
-  onSave: (d: DespesaInsert, file: File | undefined, id?: string) => Promise<void>
+  onSave: (d: DespesaInsert, file: File | undefined, id?: string, gerar?: number) => Promise<void>
+  onCancelarAssinatura: (d: Despesa, cutoff: string) => Promise<void>
 }) {
   const [form, setForm] = useState<DespesaInsert>(EMPTY_FORM)
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [parcelaModo, setParcelaModo] = useState<'continuo' | 'parcelado'>('continuo')
   const [parcelaQtd, setParcelaQtd]   = useState(12)
+  const [contMeses, setContMeses]     = useState(12)
   const [internacional, setInternacional] = useState(false)
   const [taxaPct, setTaxaPct]             = useState(0)
+  const [cancelando, setCancelando]       = useState(false)
+  const [cancelData, setCancelData]       = useState(() => new Date().toISOString().split('T')[0])
 
   useEffect(() => {
     if (open) {
@@ -196,8 +200,11 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave }: {
       setArquivo(null)
       setParcelaModo(editing?.parcela_total ? 'parcelado' : 'continuo')
       setParcelaQtd(editing?.parcela_total ?? 12)
+      setContMeses(12)
       setInternacional(base?.internacional ?? false)
       setTaxaPct(base?.taxa_pct ?? 0)
+      setCancelando(false)
+      setCancelData(new Date().toISOString().split('T')[0])
     }
   }, [open, editing, duplicando])
   if (!open) return null
@@ -222,12 +229,24 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave }: {
       taxa_pct: internacional ? taxaPct : null,
       internacional,
     }
+    let gerar: number | undefined
     if (!editing && form.recorrente) {
       payload.parcela_total = parcelaModo === 'parcelado' ? parcelaQtd : null
+      gerar = parcelaModo === 'parcelado' ? parcelaQtd : contMeses
     }
-    await onSave(payload, arquivo ?? undefined, editing?.id)
+    await onSave(payload, arquivo ?? undefined, editing?.id, gerar)
     setSaving(false)
   }
+
+  async function handleCancelarAssinatura() {
+    if (!editing || !cancelData) return
+    setSaving(true)
+    await onCancelarAssinatura(editing, cancelData)
+    setSaving(false)
+  }
+
+  // Assinatura recorrente em edição → pode ser cancelada (interrompe os lançamentos futuros)
+  const podeCancelarAssinatura = !!editing?.serie_id
 
   const inp = `w-full bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg px-3 py-2 text-white text-sm
     focus:outline-none focus:border-violet-600 transition-colors`
@@ -366,18 +385,25 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave }: {
                       </button>
                     </div>
                   </div>
-                  {parcelaModo === 'parcelado' && (
+                  {parcelaModo === 'parcelado' ? (
                     <div>
                       <label className={lbl}>Número de parcelas</label>
                       <input type="number" min={2} max={120} value={parcelaQtd}
                         onChange={e => setParcelaQtd(Math.max(2, parseInt(e.target.value) || 2))}
                         className={inp} />
                     </div>
+                  ) : (
+                    <div>
+                      <label className={lbl}>Quantos meses gerar</label>
+                      <input type="number" min={1} max={120} value={contMeses}
+                        onChange={e => setContMeses(Math.min(120, Math.max(1, parseInt(e.target.value) || 1)))}
+                        className={inp} />
+                    </div>
                   )}
                   <p className="text-[11px] text-violet-300/80">
                     {parcelaModo === 'parcelado'
                       ? `Serão lançadas ${parcelaQtd} parcelas, uma a cada período, a partir da data informada.`
-                      : `Serão lançados 12 meses à frente. Quando o valor mudar, edite o mês específico.`}
+                      : `Serão lançados ${contMeses} ${contMeses > 1 ? 'meses' : 'mês'} à frente. Quando o valor mudar, edite o mês específico.`}
                   </p>
                 </>
               )}
@@ -430,6 +456,47 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave }: {
               )}
             </label>
           </div>
+
+          {/* Cancelar assinatura — só para lançamentos de uma série recorrente */}
+          {podeCancelarAssinatura && (
+            <div className="border border-red-900/40 bg-red-950/20 rounded-lg p-3">
+              {!cancelando ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-red-300 font-medium">Cancelar assinatura</p>
+                    <p className="text-xs text-gray-500">
+                      Interrompe a recorrência e remove os lançamentos futuros ainda não pagos. O histórico é mantido.
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setCancelando(true)}
+                    className="flex-shrink-0 text-sm text-red-300 border border-red-800/60 hover:bg-red-900/30 px-3 py-2 rounded-lg transition-colors">
+                    Cancelar assinatura
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-red-300 font-medium">Cancelar a partir de qual data?</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Todos os lançamentos desta série <span className="font-medium text-gray-400">a partir do dia escolhido</span> serão
+                      removidos. Os anteriores permanecem como histórico.
+                    </p>
+                  </div>
+                  <input type="date" value={cancelData} onChange={e => setCancelData(e.target.value)} className={inp} />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setCancelando(false)}
+                      className="flex-1 bg-[#1e1e2e] hover:bg-[#2d2d3d] text-gray-300 font-medium py-2 rounded-lg transition-colors text-sm">
+                      Voltar
+                    </button>
+                    <button type="button" onClick={handleCancelarAssinatura} disabled={saving || !cancelData}
+                      className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2 rounded-lg transition-colors text-sm">
+                      {saving ? 'Cancelando…' : 'Confirmar cancelamento'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
@@ -838,10 +905,12 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
                     <td className="px-4 py-3 text-white font-medium max-w-[200px]">
                       <span className="truncate block">{d.descricao}</span>
                       {d.recorrente && (
-                        <span className="text-violet-400 text-[11px] flex items-center gap-1 mt-0.5">
+                        <span className={`text-[11px] flex items-center gap-1 mt-0.5 ${d.assinatura_ativa === false ? 'text-gray-500' : 'text-violet-400'}`}>
                           <span>↺</span>
                           {d.periodicidade && <span>{d.periodicidade}</span>}
-                          {d.parcela_total ? (
+                          {d.assinatura_ativa === false ? (
+                            <span className="text-red-400/80">· cancelada</span>
+                          ) : d.parcela_total ? (
                             <span className="text-gray-500">· parcela {d.parcela_num}/{d.parcela_total}</span>
                           ) : d.parcela_num ? (
                             <span className="text-gray-600">· fixo contínuo</span>
@@ -1099,7 +1168,7 @@ export default function FinanceiroPage() {
     setDuplicando(null)
   }
 
-  async function handleSave(d: DespesaInsert, file: File | undefined, id?: string) {
+  async function handleSave(d: DespesaInsert, file: File | undefined, id?: string, gerar?: number) {
     const payload = { ...d }
 
     if (file) {
@@ -1124,7 +1193,8 @@ export default function FinanceiroPage() {
       toast.success('Despesa atualizada')
     } else if (payload.recorrente && payload.periodicidade) {
       // Nova despesa recorrente → gera a série de lançamentos
-      const total = payload.parcela_total ?? 12 // contínuo = janela de 12 ocorrências
+      // parcelado usa o total de parcelas; contínuo usa a quantidade escolhida (padrão 12)
+      const total = payload.parcela_total ?? gerar ?? 12
       const serieId = crypto.randomUUID()
       const ehParcelado = payload.parcela_total != null
       const rows = Array.from({ length: total }, (_, i) => ({
@@ -1170,6 +1240,41 @@ export default function FinanceiroPage() {
     if (!await confirmar({ titulo: 'Excluir esta despesa?', confirmLabel: 'Excluir', perigoso: true })) return
     await supabase.from('despesas').delete().eq('id', d.id)
     toast.success('Despesa excluída'); fetchDespesas()
+  }
+
+  // Cancela uma assinatura recorrente: remove os lançamentos da série a partir do
+  // cutoff (inclusive) e mantém o histórico já lançado. Não regenera nada.
+  async function handleCancelarAssinatura(d: Despesa, cutoff: string) {
+    if (!d.serie_id) return
+    const ok = await confirmar({
+      titulo: 'Cancelar assinatura?',
+      mensagem: `Os lançamentos desta série a partir de ${new Date(cutoff + 'T00:00:00').toLocaleDateString('pt-BR')} serão removidos.\nO histórico anterior é mantido. Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Cancelar assinatura',
+      cancelLabel: 'Voltar',
+      perigoso: true,
+    })
+    if (!ok) return
+    // 1) marca a série inteira como inativa — o cron de renovação mensal ignora
+    //    séries com assinatura_ativa = false e para de adicionar novos meses.
+    const { error: flagErr } = await supabase
+      .from('despesas')
+      .update({ assinatura_ativa: false })
+      .eq('serie_id', d.serie_id)
+    if (flagErr) { toast.error(`Erro ao cancelar: ${flagErr.message}`); return }
+    // 2) remove os lançamentos futuros ainda não pagos; mantém o histórico anterior.
+    const { data: removidas, error } = await supabase
+      .from('despesas')
+      .delete()
+      .eq('serie_id', d.serie_id)
+      .gte('data', cutoff)
+      .select('id')
+    if (error) { toast.error(`Erro ao cancelar: ${error.message}`); return }
+    const n = removidas?.length ?? 0
+    toast.success(n
+      ? `Assinatura cancelada · ${n} lançamento${n > 1 ? 's' : ''} futuro${n > 1 ? 's' : ''} removido${n > 1 ? 's' : ''}`
+      : 'Assinatura cancelada')
+    closeModal()
+    fetchDespesas()
   }
 
   async function handleDeleteMany(ids: string[]) {
@@ -1276,7 +1381,7 @@ export default function FinanceiroPage() {
         )}
       </div>
 
-      <ModalDespesa open={modalOpen} editing={editing} duplicando={duplicando} onClose={closeModal} onSave={handleSave} />
+      <ModalDespesa open={modalOpen} editing={editing} duplicando={duplicando} onClose={closeModal} onSave={handleSave} onCancelarAssinatura={handleCancelarAssinatura} />
     </PainelShell>
   )
 }
