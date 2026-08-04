@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
 import SubNav from '@/components/SubNav'
-import { toast, confirmar } from '@/components/Feedback'
+import { toast, confirmar, escolher } from '@/components/Feedback'
 import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
 import { SUBNAV } from '@/lib/nav'
 import {
@@ -32,11 +32,6 @@ const fmtK = (v: number) =>
 const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 const MESES_FULL  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-function mesAtual() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
 // Soma N períodos a uma data 'YYYY-MM-DD' conforme a periodicidade.
 // Para Mensal/Anual mantém o dia, com clamp no último dia do mês (ex: 31 jan → 28 fev).
 function addPeriodo(dataISO: string, periodicidade: string, n: number): string {
@@ -55,6 +50,43 @@ function addPeriodo(dataISO: string, periodicidade: string, n: number): string {
   const ultimoDia = new Date(Date.UTC(novoAno, novoMes + 1, 0)).getUTCDate()
   const dia = Math.min(d, ultimoDia)
   return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+
+// Conta quantas ocorrências de uma periodicidade cabem entre a data inicial e um limite.
+// inclusivo=true  → conta ocorrências com data <= limite (usado em "até uma data").
+// inclusivo=false → conta ocorrências com data <  limite (usado em janela de N meses).
+function contarOcorrencias(dataInicio: string, periodicidade: string, dataLimite: string, inclusivo: boolean): number {
+  let n = 0
+  while (n < 600) {
+    const d = addPeriodo(dataInicio, periodicidade, n)
+    if (inclusivo ? d > dataLimite : d >= dataLimite) break
+    n++
+  }
+  return Math.max(n, 1)
+}
+
+// Fator de conversão da periodicidade para custo mensal equivalente (run-rate).
+const FATOR_MENSAL: Record<string, number> = {
+  Semanal:   52 / 12,   // ~4,33 semanas por mês
+  Quinzenal: 24 / 12,   // 2 quinzenas por mês
+  Mensal:    1,
+  Anual:     1 / 12,
+}
+
+// Custo recorrente mensal aproximado: pega a ocorrência mais recente de cada série
+// (ou de cada descrição, quando sem série) e converte para o equivalente mensal.
+// Retorna a lista ordenada do maior para o menor custo mensal.
+function recorrentesMensais(despesas: Despesa[]): { nome: string; mensal: number }[] {
+  const maisRecente = new Map<string, Despesa>()
+  for (const d of despesas) {
+    if (!d.recorrente) continue
+    const chave = d.serie_id ?? `${d.descricao}|${d.periodicidade ?? 'Mensal'}`
+    const atual = maisRecente.get(chave)
+    if (!atual || d.data > atual.data) maisRecente.set(chave, d)
+  }
+  return Array.from(maisRecente.values())
+    .map(d => ({ nome: d.descricao, mensal: Number(d.valor) * (FATOR_MENSAL[d.periodicidade ?? 'Mensal'] ?? 1) }))
+    .sort((a, b) => b.mensal - a.mensal)
 }
 
 const CHART_COLORS = ['#7c3aed','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16','#f97316']
@@ -175,7 +207,7 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
   editing: Despesa | null
   duplicando: Despesa | null
   onClose: () => void
-  onSave: (d: DespesaInsert, file: File | undefined, id?: string, gerar?: number) => Promise<void>
+  onSave: (d: DespesaInsert, file: File | undefined, id?: string, qtdContinuo?: number) => Promise<void>
   onCancelarAssinatura: (d: Despesa, cutoff: string) => Promise<void>
 }) {
   const [form, setForm] = useState<DespesaInsert>(EMPTY_FORM)
@@ -183,7 +215,8 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
   const [saving, setSaving] = useState(false)
   const [parcelaModo, setParcelaModo] = useState<'continuo' | 'parcelado'>('continuo')
   const [parcelaQtd, setParcelaQtd]   = useState(12)
-  const [contMeses, setContMeses]     = useState(12)
+  const [horizonte, setHorizonte]     = useState<'12' | '24' | '36' | 'data'>('12')
+  const [recorrenciaAte, setRecorrenciaAte] = useState('')
   const [internacional, setInternacional] = useState(false)
   const [taxaPct, setTaxaPct]             = useState(0)
   const [cancelando, setCancelando]       = useState(false)
@@ -200,7 +233,8 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
       setArquivo(null)
       setParcelaModo(editing?.parcela_total ? 'parcelado' : 'continuo')
       setParcelaQtd(editing?.parcela_total ?? 12)
-      setContMeses(12)
+      setHorizonte('12')
+      setRecorrenciaAte('')
       setInternacional(base?.internacional ?? false)
       setTaxaPct(base?.taxa_pct ?? 0)
       setCancelando(false)
@@ -219,6 +253,21 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
   const valorTaxa  = internacional ? valorBase * (taxaPct / 100) : 0
   const valorTotal = Math.round((valorBase + valorTaxa) * 100) / 100
 
+  // Quantas ocorrências serão geradas para o modo contínuo, conforme o horizonte
+  const periodicidade = form.periodicidade ?? 'Mensal'
+  const qtdContinuo = (() => {
+    if (horizonte === 'data') {
+      if (!recorrenciaAte || recorrenciaAte < form.data) return 0
+      return contarOcorrencias(form.data, periodicidade, recorrenciaAte, true)
+    }
+    const limite = addPeriodo(form.data, 'Mensal', parseInt(horizonte))
+    return contarOcorrencias(form.data, periodicidade, limite, false)
+  })()
+  const qtdGerada    = parcelaModo === 'parcelado' ? parcelaQtd : qtdContinuo
+  const ultimaData   = qtdGerada > 0 ? addPeriodo(form.data, periodicidade, qtdGerada - 1) : form.data
+  const totalGerado  = qtdGerada * valorTotal
+  const fmtDataCurta = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -229,12 +278,11 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
       taxa_pct: internacional ? taxaPct : null,
       internacional,
     }
-    let gerar: number | undefined
     if (!editing && form.recorrente) {
       payload.parcela_total = parcelaModo === 'parcelado' ? parcelaQtd : null
-      gerar = parcelaModo === 'parcelado' ? parcelaQtd : contMeses
     }
-    await onSave(payload, arquivo ?? undefined, editing?.id, gerar)
+    const qtd = !editing && form.recorrente && parcelaModo === 'continuo' ? qtdContinuo : undefined
+    await onSave(payload, arquivo ?? undefined, editing?.id, qtd)
     setSaving(false)
   }
 
@@ -385,26 +433,63 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
                       </button>
                     </div>
                   </div>
-                  {parcelaModo === 'parcelado' ? (
+                  {parcelaModo === 'parcelado' && (
                     <div>
                       <label className={lbl}>Número de parcelas</label>
                       <input type="number" min={2} max={120} value={parcelaQtd}
                         onChange={e => setParcelaQtd(Math.max(2, parseInt(e.target.value) || 2))}
                         className={inp} />
                     </div>
-                  ) : (
+                  )}
+                  {parcelaModo === 'continuo' && (
                     <div>
-                      <label className={lbl}>Quantos meses gerar</label>
-                      <input type="number" min={1} max={120} value={contMeses}
-                        onChange={e => setContMeses(Math.min(120, Math.max(1, parseInt(e.target.value) || 1)))}
-                        className={inp} />
+                      <label className={lbl}>Repetir por</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {([['12','12 meses'],['24','24 meses'],['36','36 meses'],['data','Até…']] as const).map(([v, txt]) => (
+                          <button type="button" key={v} onClick={() => setHorizonte(v)}
+                            className={`px-2 py-2 rounded-lg text-xs transition-colors border ${
+                              horizonte === v
+                                ? 'bg-violet-600 border-violet-600 text-white'
+                                : 'bg-[#0a0a0f] border-[#2d2d3d] text-gray-400 hover:text-white'
+                            }`}>
+                            {txt}
+                          </button>
+                        ))}
+                      </div>
+                      {horizonte === 'data' && (
+                        <input type="date" value={recorrenciaAte} min={form.data}
+                          onChange={e => setRecorrenciaAte(e.target.value)}
+                          className={`${inp} mt-2`} />
+                      )}
                     </div>
                   )}
-                  <p className="text-[11px] text-violet-300/80">
-                    {parcelaModo === 'parcelado'
-                      ? `Serão lançadas ${parcelaQtd} parcelas, uma a cada período, a partir da data informada.`
-                      : `Serão lançados ${contMeses} ${contMeses > 1 ? 'meses' : 'mês'} à frente. Quando o valor mudar, edite o mês específico.`}
-                  </p>
+
+                  {/* Prévia do que será lançado */}
+                  {qtdGerada > 0 ? (
+                    <div className="bg-[#0a0a0f] border border-violet-800/30 rounded-lg p-3 space-y-1.5 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Lançamentos</span>
+                        <span className="text-white font-semibold">{qtdGerada}× {periodicidade.toLowerCase()}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Período</span>
+                        <span className="text-gray-200">{fmtDataCurta(form.data)} → {fmtDataCurta(ultimaData)}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-[#1e1e2e]">
+                        <span className="text-gray-400">Total comprometido</span>
+                        <span className="text-violet-300 font-bold">{fmt(totalGerado)}</span>
+                      </div>
+                      {parcelaModo === 'continuo' && (
+                        <p className="text-gray-600 pt-1">Valor fixo em todos os meses — se mudar, edite o mês específico.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-amber-400/80">
+                      {horizonte === 'data'
+                        ? 'Escolha uma data final posterior à data inicial.'
+                        : 'Nenhum lançamento no período escolhido.'}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -502,8 +587,8 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
             <button type="button" onClick={onClose}
               className="flex-1 bg-[#1e1e2e] hover:bg-[#2d2d3d] text-gray-300 font-medium py-2.5 rounded-lg transition-colors text-sm">
               Cancelar</button>
-            <button type="submit" disabled={saving}
-              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
+            <button type="submit" disabled={saving || (!editing && form.recorrente && qtdGerada < 1)}
+              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
               {saving ? 'Salvando…' : 'Salvar'}</button>
           </div>
         </form>
@@ -549,8 +634,11 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
   const totalFixo    = despesas.filter(d => d.tipo === 'fixo').reduce((s, d) => s + Number(d.valor), 0)
   const totalVar     = despesas.filter(d => d.tipo === 'variavel').reduce((s, d) => s + Number(d.valor), 0)
   const totalPontual = despesas.filter(d => d.tipo === 'pontual').reduce((s, d) => s + Number(d.valor), 0)
-  const custoFixoRec = despesas.filter(d => d.recorrente).reduce((s, d) => s + Number(d.valor), 0)
-  const supabaseCusto = despesas.filter(d => d.descricao.toLowerCase().includes('supabase')).reduce((s, d) => s + Number(d.valor), 0)
+  // Recorrentes do mês (soma direta) vs. run-rate mensal (equivalente por série)
+  const recorrenteMes = despesas.filter(d => d.recorrente).reduce((s, d) => s + Number(d.valor), 0)
+  const recs          = recorrentesMensais(despesas)
+  const runRateMensal = recs.reduce((s, r) => s + r.mensal, 0)
+  const maiorRec      = recs[0]
   const maiorCategoria = porCategoria[0]
 
   const labelPeriodo = isGeral ? 'acumulado' : 'no período'
@@ -565,9 +653,9 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
           sub={`${despesas.length} lançamentos`}
         />
         <KpiCard
-          label={isGeral ? 'Custo fixo recorrente' : 'Custo fixo'}
-          value={fmt(custoFixoRec)}
-          sub="apenas recorrentes"
+          label={isGeral ? 'Custo fixo mensal ~' : 'Custo fixo do mês'}
+          value={fmt(isGeral ? runRateMensal : recorrenteMes)}
+          sub={isGeral ? 'run-rate dos recorrentes' : 'recorrentes do mês'}
           color="text-blue-400"
         />
         <KpiCard
@@ -577,10 +665,10 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
           color="text-yellow-400"
         />
         <KpiCard
-          label="Supabase"
-          value={fmt(supabaseCusto)}
-          sub={isGeral ? 'cresceu 4× em 2 meses' : 'no período'}
-          alert={supabaseCusto > 150}
+          label="Maior custo recorrente"
+          value={maiorRec ? fmt(maiorRec.mensal) : '—'}
+          sub={maiorRec ? `${maiorRec.nome} · por mês` : 'sem recorrentes'}
+          color="text-violet-300"
         />
       </div>
 
@@ -722,7 +810,6 @@ function DashboardView({ despesas, periodo }: { despesas: Despesa[]; periodo: st
             <span className="font-semibold">📊 Maior categoria:</span>{' '}
             <span className="font-bold">{maiorCategoria.name}</span> representa{' '}
             <span className="font-bold">{((maiorCategoria.value / total) * 100).toFixed(1)}%</span> do total ({fmt(maiorCategoria.value)}).
-            {maiorCategoria.name === 'Infraestrutura' && ' Monitore o Supabase — cresceu 4× em 2 meses.'}
           </p>
         </div>
       )}
@@ -977,6 +1064,7 @@ function ProjecaoView({ despesas, receitas, ultimaRenovacao }: { despesas: Despe
 
   // Janela: mês atual + 11 meses à frente
   const hoje = new Date()
+  const hojeISO = hoje.toISOString().slice(0, 10)
   const meses: string[] = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -985,12 +1073,15 @@ function ProjecaoView({ despesas, receitas, ultimaRenovacao }: { despesas: Despe
   const receitaValida = (r: Receita) => r.status !== 'cancelado' && r.status !== 'estornado'
 
   let acumulado = saldoInicial
-  const linhas = meses.map(mes => {
+  const linhas = meses.map((mes, idx) => {
+    // No mês atual (idx 0), conta só o que ainda vai acontecer (data >= hoje) —
+    // o que já entrou/saiu antes de hoje já está refletido no "saldo atual em caixa".
+    const noPeriodo = (data: string) => data.startsWith(mes) && (idx > 0 || data >= hojeISO)
     const entradas = receitas
-      .filter(r => receitaValida(r) && r.data.startsWith(mes))
+      .filter(r => receitaValida(r) && noPeriodo(r.data))
       .reduce((s, r) => s + Number(r.valor), 0)
     const saidas = despesas
-      .filter(d => d.data.startsWith(mes))
+      .filter(d => noPeriodo(d.data))
       .reduce((s, d) => s + Number(d.valor), 0)
     const resultado = entradas - saidas
     acumulado += resultado
@@ -1091,8 +1182,8 @@ function ProjecaoView({ despesas, receitas, ultimaRenovacao }: { despesas: Despe
 
       <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-gray-600">
         <p>
-          💡 Projeção baseada nos lançamentos já registrados (incluindo despesas fixas e parcelas futuras).
-          Cadastre receitas recorrentes para enriquecer as entradas previstas.
+          💡 O mês atual conta apenas o que ainda vai ocorrer (de hoje em diante) sobre o saldo em caixa informado.
+          Baseia-se nos lançamentos já registrados — recorrentes contínuos só projetam até onde a série foi gerada.
         </p>
         {ultimaRenovacao && (
           <span className="text-gray-700 whitespace-nowrap">
@@ -1168,7 +1259,7 @@ export default function FinanceiroPage() {
     setDuplicando(null)
   }
 
-  async function handleSave(d: DespesaInsert, file: File | undefined, id?: string, gerar?: number) {
+  async function handleSave(d: DespesaInsert, file: File | undefined, id?: string, qtdContinuo?: number) {
     const payload = { ...d }
 
     if (file) {
@@ -1193,8 +1284,8 @@ export default function FinanceiroPage() {
       toast.success('Despesa atualizada')
     } else if (payload.recorrente && payload.periodicidade) {
       // Nova despesa recorrente → gera a série de lançamentos
-      // parcelado usa o total de parcelas; contínuo usa a quantidade escolhida (padrão 12)
-      const total = payload.parcela_total ?? gerar ?? 12
+      // parcelado usa o nº de parcelas; contínuo usa o horizonte escolhido (fallback 12)
+      const total = payload.parcela_total ?? qtdContinuo ?? 12
       const serieId = crypto.randomUUID()
       const ehParcelado = payload.parcela_total != null
       const rows = Array.from({ length: total }, (_, i) => ({
@@ -1221,24 +1312,38 @@ export default function FinanceiroPage() {
   }
 
   async function handleDelete(d: Despesa) {
+    const dataFmt = new Date(d.data + 'T00:00:00').toLocaleDateString('pt-BR')
     if (d.serie_id) {
-      const serieToda = await confirmar({
-        titulo: 'Excluir série recorrente?',
-        mensagem: 'Esta despesa faz parte de uma série.\n"Excluir série" remove todos os lançamentos; "Só este" remove apenas este mês.',
-        confirmLabel: 'Excluir série',
-        cancelLabel: 'Só este',
-        perigoso: true,
+      const escolha = await escolher({
+        titulo: 'Excluir lançamento recorrente',
+        mensagem: `"${d.descricao}" faz parte de uma série.\nEscolha o que remover:`,
+        opcoes: [
+          { key: 'este',     label: 'Somente este mês', descricao: dataFmt },
+          { key: 'proximos', label: 'Este e os próximos', descricao: `deste (${dataFmt}) em diante — mantém o histórico`, perigoso: true },
+          { key: 'serie',    label: 'Série inteira', descricao: 'remove passados e futuros', perigoso: true },
+        ],
       })
-      if (serieToda) {
-        await supabase.from('despesas').delete().eq('serie_id', d.serie_id)
+      if (!escolha) return
+      if (escolha === 'serie') {
+        const { error } = await supabase.from('despesas').delete().eq('serie_id', d.serie_id)
+        if (error) { toast.error(`Erro: ${error.message}`); return }
         toast.success('Série excluída'); fetchDespesas(); return
       }
-      if (!await confirmar({ titulo: 'Excluir só este lançamento?', confirmLabel: 'Excluir', perigoso: true })) return
-      await supabase.from('despesas').delete().eq('id', d.id)
+      if (escolha === 'proximos') {
+        const { data: del, error } = await supabase.from('despesas')
+          .delete().eq('serie_id', d.serie_id).gte('data', d.data).select('id')
+        if (error) { toast.error(`Erro: ${error.message}`); return }
+        toast.success(`${del?.length ?? 0} lançamento${(del?.length ?? 0) > 1 ? 's' : ''} excluído${(del?.length ?? 0) > 1 ? 's' : ''} (deste em diante)`)
+        fetchDespesas(); return
+      }
+      // 'este'
+      const { error } = await supabase.from('despesas').delete().eq('id', d.id)
+      if (error) { toast.error(`Erro: ${error.message}`); return }
       toast.success('Lançamento excluído'); fetchDespesas(); return
     }
     if (!await confirmar({ titulo: 'Excluir esta despesa?', confirmLabel: 'Excluir', perigoso: true })) return
-    await supabase.from('despesas').delete().eq('id', d.id)
+    const { error } = await supabase.from('despesas').delete().eq('id', d.id)
+    if (error) { toast.error(`Erro: ${error.message}`); return }
     toast.success('Despesa excluída'); fetchDespesas()
   }
 

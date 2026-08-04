@@ -61,16 +61,53 @@ function resolverConfirm(ok: boolean) {
   emitConfirm()
 }
 
+/* ─── Escolha (diálogo com N opções) ──────────────────────────────────────────
+   Para casos que não cabem em sim/não. Retorna a `key` da opção ou null (cancelou).
+     const op = await escolher({ titulo: '…', opcoes: [{ key: 'a', label: 'A' }, …] })
+─────────────────────────────────────────────────────────────────────────── */
+
+export type EscolhaOpcao = { key: string; label: string; descricao?: string; perigoso?: boolean }
+export type EscolherOpts = {
+  titulo: string
+  mensagem?: string
+  opcoes: EscolhaOpcao[]
+  cancelLabel?: string
+}
+type EscolherState = (EscolherOpts & { resolve: (key: string | null) => void }) | null
+
+let escolherState: EscolherState = null
+const escolherListeners = new Set<(s: EscolherState) => void>()
+const emitEscolher = () => escolherListeners.forEach(l => l(escolherState))
+
+export function escolher(opts: EscolherOpts): Promise<string | null> {
+  return new Promise(resolve => {
+    escolherState = { ...opts, resolve }
+    emitEscolher()
+  })
+}
+
+function resolverEscolher(key: string | null) {
+  escolherState?.resolve(key)
+  escolherState = null
+  emitEscolher()
+}
+
 /* ─── Host (montar no layout) ─────────────────────────────────────────────── */
 
 export default function FeedbackHost() {
   const [lista, setLista]   = useState<ToastItem[]>([])
   const [conf, setConf]     = useState<ConfirmState>(null)
+  const [esc, setEsc]       = useState<EscolherState>(null)
 
   useEffect(() => {
     toastListeners.add(setLista)
     confirmListeners.add(setConf)
-    return () => { toastListeners.delete(setLista); confirmListeners.delete(setConf) }
+    escolherListeners.add(setEsc)
+    return () => {
+      toastListeners.delete(setLista)
+      confirmListeners.delete(setConf)
+      escolherListeners.delete(setEsc)
+    }
   }, [])
 
   const cor = (t: ToastTipo) =>
@@ -110,6 +147,35 @@ export default function FeedbackHost() {
                   conf.perigoso ? 'bg-red-600 hover:bg-red-700' : 'bg-violet-600 hover:bg-violet-700'
                 }`}>
                 {conf.confirmLabel ?? 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Escolha (N opções) */}
+      {esc && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => resolverEscolher(null)}>
+          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-sm p-5"
+            onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-white text-lg">{esc.titulo}</h3>
+            {esc.mensagem && <p className="text-sm text-gray-400 mt-2 whitespace-pre-line">{esc.mensagem}</p>}
+            <div className="flex flex-col gap-2 mt-5">
+              {esc.opcoes.map(op => (
+                <button key={op.key} onClick={() => resolverEscolher(op.key)}
+                  className={`w-full text-left px-4 py-2.5 rounded-lg transition-colors text-sm border ${
+                    op.perigoso
+                      ? 'border-red-800/60 bg-red-900/20 hover:bg-red-900/40 text-red-200'
+                      : 'border-[#2d2d3d] bg-[#0a0a0f] hover:bg-[#1e1e2e] text-gray-200'
+                  }`}>
+                  <span className="font-medium">{op.label}</span>
+                  {op.descricao && <span className="block text-xs text-gray-500 mt-0.5">{op.descricao}</span>}
+                </button>
+              ))}
+              <button onClick={() => resolverEscolher(null)}
+                className="w-full mt-1 px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white transition-colors">
+                {esc.cancelLabel ?? 'Cancelar'}
               </button>
             </div>
           </div>

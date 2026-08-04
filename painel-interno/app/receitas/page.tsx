@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
 import SubNav from '@/components/SubNav'
-import { toast, confirmar } from '@/components/Feedback'
+import { toast, confirmar, escolher } from '@/components/Feedback'
 import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
 import { SUBNAV } from '@/lib/nav'
 import {
@@ -76,6 +76,18 @@ function addPeriodo(dataISO: string, periodicidade: string, n: number): string {
   return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
 
+// Conta quantas ocorrências cabem entre a data inicial e um limite.
+// inclusivo=true → data <= limite (até uma data); false → data < limite (janela de N meses).
+function contarOcorrencias(dataInicio: string, periodicidade: string, dataLimite: string, inclusivo: boolean): number {
+  let n = 0
+  while (n < 600) {
+    const d = addPeriodo(dataInicio, periodicidade, n)
+    if (inclusivo ? d > dataLimite : d >= dataLimite) break
+    n++
+  }
+  return Math.max(n, 1)
+}
+
 const STATUS_CORES: Record<string, string> = {
   recebido:   'bg-emerald-900/40 text-emerald-300 border border-emerald-800',
   confirmado: 'bg-emerald-900/40 text-emerald-300 border border-emerald-800',
@@ -140,23 +152,43 @@ function ModalReceita({ open, editing, onClose, onSave }: {
   open: boolean
   editing: Receita | null
   onClose: () => void
-  onSave: (r: ReceitaInsert, id?: string) => Promise<void>
+  onSave: (r: ReceitaInsert, id?: string, qtdContinuo?: number) => Promise<void>
 }) {
   const [form, setForm]   = useState<ReceitaInsert>(formInicial())
   const [saving, setSave] = useState(false)
   const [parcelaModo, setParcelaModo] = useState<'continuo' | 'parcelado'>('continuo')
   const [parcelaQtd, setParcelaQtd]   = useState(12)
+  const [horizonte, setHorizonte]     = useState<'12' | '24' | '36' | 'data'>('12')
+  const [recorrenciaAte, setRecorrenciaAte] = useState('')
 
   useEffect(() => {
     if (open) {
       setForm(editing ? receitaToForm(editing) : formInicial())
       setParcelaModo(editing?.parcela_total ? 'parcelado' : 'continuo')
       setParcelaQtd(editing?.parcela_total ?? 12)
+      setHorizonte('12')
+      setRecorrenciaAte('')
     }
   }, [open, editing])
   if (!open) return null
 
   const set = (k: keyof ReceitaInsert, v: unknown) => setForm(f => ({ ...f, [k]: v }))
+
+  // Quantas ocorrências serão geradas no modo contínuo, conforme o horizonte
+  const periodicidade = form.periodicidade ?? 'Mensal'
+  const valorTotal = Number(form.valor) || 0
+  const qtdContinuo = (() => {
+    if (horizonte === 'data') {
+      if (!recorrenciaAte || recorrenciaAte < form.data) return 0
+      return contarOcorrencias(form.data, periodicidade, recorrenciaAte, true)
+    }
+    const limite = addPeriodo(form.data, 'Mensal', parseInt(horizonte))
+    return contarOcorrencias(form.data, periodicidade, limite, false)
+  })()
+  const qtdGerada    = parcelaModo === 'parcelado' ? parcelaQtd : qtdContinuo
+  const ultimaData   = qtdGerada > 0 ? addPeriodo(form.data, periodicidade, qtdGerada - 1) : form.data
+  const totalGerado  = qtdGerada * valorTotal
+  const fmtDataCurta = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setSave(true)
@@ -164,7 +196,8 @@ function ModalReceita({ open, editing, onClose, onSave }: {
     if (!editing && form.recorrente) {
       payload.parcela_total = parcelaModo === 'parcelado' ? parcelaQtd : null
     }
-    await onSave(payload, editing?.id); setSave(false)
+    const qtd = !editing && form.recorrente && parcelaModo === 'continuo' ? qtdContinuo : undefined
+    await onSave(payload, editing?.id, qtd); setSave(false)
   }
 
   const isAsaas = editing?.origem === 'asaas'
@@ -288,11 +321,52 @@ function ModalReceita({ open, editing, onClose, onSave }: {
                         onChange={e => setParcelaQtd(Math.max(2, parseInt(e.target.value) || 2))}
                         className={inp} />
                     )}
-                    <p className="text-[11px] text-violet-300/80">
-                      {parcelaModo === 'parcelado'
-                        ? `Serão lançadas ${parcelaQtd} parcelas a partir da data.`
-                        : 'Serão lançados 12 meses à frente (renovados automaticamente).'}
-                    </p>
+                    {parcelaModo === 'continuo' && (
+                      <div>
+                        <label className={lbl}>Repetir por</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {([['12','12 meses'],['24','24 meses'],['36','36 meses'],['data','Até…']] as const).map(([v, txt]) => (
+                            <button type="button" key={v} onClick={() => setHorizonte(v)}
+                              className={`px-2 py-2 rounded-lg text-xs transition-colors border ${
+                                horizonte === v
+                                  ? 'bg-violet-600 border-violet-600 text-white'
+                                  : 'bg-[#0a0a0f] border-[#2d2d3d] text-gray-400 hover:text-white'
+                              }`}>
+                              {txt}
+                            </button>
+                          ))}
+                        </div>
+                        {horizonte === 'data' && (
+                          <input type="date" value={recorrenciaAte} min={form.data}
+                            onChange={e => setRecorrenciaAte(e.target.value)}
+                            className={`${inp} mt-2`} />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Prévia do que será lançado */}
+                    {qtdGerada > 0 ? (
+                      <div className="bg-[#0a0a0f] border border-violet-800/30 rounded-lg p-3 space-y-1.5 text-[11px]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-400">Lançamentos</span>
+                          <span className="text-white font-semibold">{qtdGerada}× {periodicidade.toLowerCase()}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-400">Período</span>
+                          <span className="text-gray-200">{fmtDataCurta(form.data)} → {fmtDataCurta(ultimaData)}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-[#1e1e2e]">
+                          <span className="text-gray-400">Total previsto</span>
+                          <span className="text-emerald-300 font-bold">{fmt(totalGerado)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-amber-400/80">
+                        {horizonte === 'data'
+                          ? 'Escolha uma data final posterior à data inicial.'
+                          : 'Nenhum lançamento no período escolhido.'}
+                      </p>
+                    )}
                   </>
                 )}
               </div>
@@ -303,8 +377,8 @@ function ModalReceita({ open, editing, onClose, onSave }: {
               className="flex-1 bg-[#1e1e2e] hover:bg-[#2d2d3d] text-gray-300 font-medium py-2.5 rounded-lg transition-colors text-sm">
               Cancelar
             </button>
-            <button type="submit" disabled={saving}
-              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
+            <button type="submit" disabled={saving || (!editing && (form.recorrente ?? false) && qtdGerada < 1)}
+              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
               {saving ? 'Salvando…' : editing ? 'Salvar Alterações' : 'Salvar Receita'}
             </button>
           </div>
@@ -364,14 +438,15 @@ export default function ReceitasPage() {
     setEditing(null)
   }
 
-  async function handleSave(r: ReceitaInsert, id?: string) {
+  async function handleSave(r: ReceitaInsert, id?: string, qtdContinuo?: number) {
     let error
     if (id) {
       const { serie_id: _s, parcela_num: _n, parcela_total: _t, ...editavel } = r
       void _s; void _n; void _t
       ;({ error } = await supabase.from('receitas').update(editavel).eq('id', id))
     } else if (r.recorrente && r.periodicidade) {
-      const total = r.parcela_total ?? 12
+      // parcelado usa o nº de parcelas; contínuo usa o horizonte escolhido (fallback 12)
+      const total = r.parcela_total ?? qtdContinuo ?? 12
       const serieId = crypto.randomUUID()
       const ehParcelado = r.parcela_total != null
       const rows = Array.from({ length: total }, (_, i) => ({
@@ -397,17 +472,30 @@ export default function ReceitasPage() {
 
   async function handleDelete(r: Receita) {
     if (r.serie_id) {
-      const serieToda = await confirmar({
-        titulo: 'Excluir série recorrente?',
-        mensagem: 'Esta receita faz parte de uma série.\n"Excluir série" remove todos os lançamentos; "Só esta" remove apenas este.',
-        confirmLabel: 'Excluir série', cancelLabel: 'Só esta', perigoso: true,
+      const dataFmt = fmtData(r.data)
+      const escolha = await escolher({
+        titulo: 'Excluir receita recorrente',
+        mensagem: `"${r.descricao}" faz parte de uma série.\nEscolha o que remover:`,
+        opcoes: [
+          { key: 'esta',     label: 'Somente esta', descricao: dataFmt },
+          { key: 'proximas', label: 'Esta e as próximas', descricao: `desta (${dataFmt}) em diante — mantém o histórico`, perigoso: true },
+          { key: 'serie',    label: 'Série inteira', descricao: 'remove passadas e futuras', perigoso: true },
+        ],
       })
-      if (serieToda) {
+      if (!escolha) return
+      if (escolha === 'serie') {
         const { error } = await supabase.from('receitas').delete().eq('serie_id', r.serie_id)
         if (error) { toast.error(`Erro: ${error.message}`); return }
         toast.success('Série excluída'); fetchReceitas(); return
       }
-      if (!await confirmar({ titulo: 'Excluir só esta receita?', confirmLabel: 'Excluir', perigoso: true })) return
+      if (escolha === 'proximas') {
+        const { data: del, error } = await supabase.from('receitas')
+          .delete().eq('serie_id', r.serie_id).gte('data', r.data).select('id')
+        if (error) { toast.error(`Erro: ${error.message}`); return }
+        toast.success(`${del?.length ?? 0} receita${(del?.length ?? 0) > 1 ? 's' : ''} excluída${(del?.length ?? 0) > 1 ? 's' : ''} (desta em diante)`)
+        fetchReceitas(); return
+      }
+      // 'esta'
     } else if (!await confirmar({ titulo: 'Excluir esta receita?', confirmLabel: 'Excluir', perigoso: true })) return
     const { error } = await supabase.from('receitas').delete().eq('id', r.id)
     if (error) { toast.error(`Erro: ${error.message}`); return }
@@ -465,20 +553,20 @@ export default function ReceitasPage() {
   }
   const totalSelecionado = filtradas.filter(r => selecionados.has(r.id)).reduce((s, r) => s + Number(r.valor), 0)
 
-  // KPIs (só status recebido/confirmado contam para total)
+  // KPIs — realizado = status válido E já vencido (data <= hoje). O futuro vira "previsto".
+  const hojeISO      = new Date().toISOString().slice(0, 10)
+  const ymAtual      = hojeISO.slice(0, 7)
+  const anoAtual     = hojeISO.slice(0, 4)
   const valido       = (r: Receita) => r.status === 'recebido' || r.status === 'confirmado'
-  const totalMes     = (() => {
-    const ym = new Date().toISOString().slice(0, 7)
-    return receitas.filter(r => valido(r) && r.data.startsWith(ym))
-      .reduce((s, r) => s + Number(r.valor), 0)
-  })()
-  const totalAno     = (() => {
-    const y = new Date().getFullYear().toString()
-    return receitas.filter(r => valido(r) && r.data.startsWith(y))
-      .reduce((s, r) => s + Number(r.valor), 0)
-  })()
-  const totalAsaas   = receitas.filter(r => valido(r) && r.origem === 'asaas').reduce((s, r) => s + Number(r.valor), 0)
-  const totalManual  = receitas.filter(r => valido(r) && r.origem === 'manual').reduce((s, r) => s + Number(r.valor), 0)
+  const realizado    = (r: Receita) => valido(r) && r.data <= hojeISO
+  const soma         = (rs: Receita[]) => rs.reduce((s, r) => s + Number(r.valor), 0)
+
+  const totalMes     = soma(receitas.filter(r => realizado(r) && r.data.startsWith(ymAtual)))
+  const totalAno     = soma(receitas.filter(r => realizado(r) && r.data.startsWith(anoAtual)))
+  // Previsto = válido, ainda a vencer, dentro do ano corrente
+  const previstoAno  = soma(receitas.filter(r => valido(r) && r.data > hojeISO && r.data.startsWith(anoAtual)))
+  const totalAsaas   = soma(receitas.filter(r => realizado(r) && r.origem === 'asaas'))
+  const totalManual  = soma(receitas.filter(r => realizado(r) && r.origem === 'manual'))
 
   const sel = `bg-[#111118] border border-[#2d2d3d] text-sm text-gray-300 rounded-lg px-3 py-2
     focus:outline-none focus:border-violet-600 transition-colors`
@@ -505,22 +593,24 @@ export default function ReceitasPage() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5">
-            <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Mês atual</p>
+            <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Recebido no mês</p>
             <p className="text-xl sm:text-2xl font-bold text-emerald-400">{fmt(totalMes)}</p>
+            <p className="text-[10px] text-gray-600 mt-1">até hoje</p>
           </div>
           <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5">
-            <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Ano corrente</p>
+            <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Recebido no ano</p>
             <p className="text-xl sm:text-2xl font-bold text-violet-400">{fmt(totalAno)}</p>
+            {previstoAno > 0 && <p className="text-[10px] text-gray-600 mt-1">+ {fmt(previstoAno)} previsto</p>}
           </div>
           <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5">
             <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Via Asaas</p>
             <p className="text-xl sm:text-2xl font-bold text-blue-400">{fmt(totalAsaas)}</p>
-            <p className="text-[10px] text-gray-600 mt-1">Total acumulado</p>
+            <p className="text-[10px] text-gray-600 mt-1">recebido</p>
           </div>
           <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5">
             <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1">Manual</p>
             <p className="text-xl sm:text-2xl font-bold text-gray-300">{fmt(totalManual)}</p>
-            <p className="text-[10px] text-gray-600 mt-1">Lançamentos avulsos</p>
+            <p className="text-[10px] text-gray-600 mt-1">recebido</p>
           </div>
         </div>
 
