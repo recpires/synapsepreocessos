@@ -66,8 +66,8 @@ export default function BalancoPage() {
 
   const [ano, setAno]             = useState<number>(anoAtual)
   const [semestre, setSemestre]   = useState<Semestre>(semestreAtual)
-  const [despesas, setDespesas]   = useState<Despesa[]>([])
-  const [receitasDb, setReceitas] = useState<Receita[]>([])
+  const [despesasTodas, setDespesas] = useState<Despesa[]>([])
+  const [receitasTodas, setReceitas] = useState<Receita[]>([])
   const [loading, setLoading]     = useState(true)
 
   // Buscar despesas + receitas do semestre
@@ -85,7 +85,21 @@ export default function BalancoPage() {
 
   useEffect(() => { fetchDados() }, [fetchDados])
 
-  // Receitas por produto (agregadas do banco)
+  // Só conta como realizado o que já venceu (data <= hoje). O restante do período é "previsto".
+  const hojeISO = hoje.toISOString().slice(0, 10)
+  const despesas    = useMemo(() => despesasTodas.filter(d => d.data <= hojeISO), [despesasTodas, hojeISO])
+  const receitasDb  = useMemo(() => receitasTodas.filter(r => r.data <= hojeISO), [receitasTodas, hojeISO])
+
+  // Previsto a realizar no restante do período selecionado (data > hoje)
+  const previstoReceita = useMemo(
+    () => receitasTodas.filter(r => r.data > hojeISO).reduce((s, r) => s + Number(r.valor), 0),
+    [receitasTodas, hojeISO])
+  const previstoDespesa = useMemo(
+    () => despesasTodas.filter(d => d.data > hojeISO).reduce((s, d) => s + Number(d.valor), 0),
+    [despesasTodas, hojeISO])
+  const temPrevisto = previstoReceita > 0 || previstoDespesa > 0
+
+  // Receitas por produto (agregadas do banco — só realizado)
   const receitasPorProduto = useMemo(() => {
     const map: Record<string, number> = {}
     for (const r of receitasDb) {
@@ -230,11 +244,11 @@ export default function BalancoPage() {
               <h2 className="text-lg font-semibold text-white print:text-black print:text-xl">Resumo</h2>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5 print:bg-white print:border-gray-300">
-                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1 print:text-gray-700">Receita total</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1 print:text-gray-700">Receita realizada</p>
                   <p className="text-xl sm:text-2xl font-bold text-emerald-400 print:text-emerald-700">{fmt(totalReceitas)}</p>
                 </div>
                 <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 sm:p-5 print:bg-white print:border-gray-300">
-                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1 print:text-gray-700">Despesa total</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wider mb-1 print:text-gray-700">Despesa realizada</p>
                   <p className="text-xl sm:text-2xl font-bold text-red-400 print:text-red-700">{fmt(totalDespesas)}</p>
                   <p className="text-xs text-gray-500 mt-1">{despesas.length} lançamentos</p>
                 </div>
@@ -251,6 +265,16 @@ export default function BalancoPage() {
                   </p>
                 </div>
               </div>
+              {temPrevisto && (
+                <div className="bg-amber-900/15 border border-amber-800/40 rounded-xl px-4 py-3 print:bg-amber-50 print:border-amber-300">
+                  <p className="text-sm text-amber-300 print:text-amber-800">
+                    ⏳ <span className="font-semibold">Ainda por realizar neste período</span> (não incluído nos totais acima):
+                    {previstoReceita > 0 && <> receitas <span className="font-bold">{fmt(previstoReceita)}</span></>}
+                    {previstoReceita > 0 && previstoDespesa > 0 && ' ·'}
+                    {previstoDespesa > 0 && <> despesas <span className="font-bold">{fmt(previstoDespesa)}</span></>}.
+                  </p>
+                </div>
+              )}
             </section>
 
             {/* Receitas por produto — agregado do banco */}
