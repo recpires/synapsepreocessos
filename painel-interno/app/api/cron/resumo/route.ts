@@ -13,6 +13,7 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
  * tipo inferido admite lista — aceitar as duas formas evita depender disso.
  */
 type ProjetoResumo = {
+  id: string
   nome: string
   fase_atual: string
   saude: string
@@ -63,9 +64,10 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     sb.from('vencimentos').select('*'),
     sb.from('projetos')
-      .select('nome, fase_atual, saude, maturidade_pct, produtos(status)')
+      .select('id, nome, fase_atual, saude, maturidade_pct, produtos(status)')
       .eq('arquivado', false),
-    sb.from('projeto_erros').select('codigo, titulo, severidade, status, detectado_em')
+    sb.from('projeto_erros')
+      .select('projeto_id, codigo, titulo, severidade, status, detectado_em')
       .in('status', ['aberto', 'investigando']),
     sb.from('propostas').select('numero, titulo, status, valor_total, validade'),
     sb.from('despesas').select('valor').gte('data', desde).lt('data', hoje),
@@ -83,8 +85,6 @@ export async function GET(req: NextRequest) {
     .reduce((a, r) => a + Number(r.valor), 0)
   const saldo = (contas ?? []).reduce((a, c) => a + Number(c.saldo_atual), 0)
 
-  const errosCriticos = (erros ?? []).filter(e => e.severidade === 'critica')
-
   // Projeto em pausa fica vermelho porque parou, não porque está atrasado —
   // é o estado esperado, não um alerta. Contá-lo enchia o resumo de todo mês
   // com os mesmos três nomes e escondia o que de fato mudou. A pausa vem de
@@ -97,6 +97,15 @@ export async function GET(req: NextRequest) {
 
   const ativos = ((projetos ?? []) as unknown as ProjetoResumo[]).filter(p => !pausado(p))
   const emRisco = ativos.filter(p => p.saude === 'vermelho')
+
+  // Erro crítico de projeto parado não é ação desta semana: ninguém vai
+  // corrigir o que ninguém está tocando. Ele continua aberto na ficha do
+  // projeto — some do resumo, não do sistema. O conjunto é de ativos, então
+  // erro de projeto arquivado também não passa.
+  const idsAtivos = new Set(ativos.map(p => p.id))
+  const errosCriticos = (erros ?? []).filter(
+    e => e.severidade === 'critica' && idsAtivos.has(e.projeto_id)
+  )
   const propostasAbertas = (propostas ?? []).filter(
     p => p.status === 'enviada' || p.status === 'em_negociacao'
   )
@@ -171,6 +180,10 @@ export async function GET(req: NextRequest) {
         vencidos: vencidos.length,
         criticos: criticos.length,
         erros_criticos: errosCriticos.length,
+        // Mesma razão do `projetos_pausados`: o que foi silenciado fica
+        // contado, para o zero acima não parecer ausência de dado.
+        erros_criticos_pausados:
+          (erros ?? []).filter(e => e.severidade === 'critica').length - errosCriticos.length,
         projetos_em_risco: emRisco.length,
         // Fica gravado para o zero em `projetos_em_risco` ser lido como
         // "nenhum ativo em risco", e não como "o cálculo quebrou".
