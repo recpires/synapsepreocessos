@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import { statusAsaas } from '@/server/integracoes'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar, escolher } from '@/components/Feedback'
 import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
@@ -407,6 +408,7 @@ export default function ReceitasPage() {
 
   const [receitas, setReceitas]   = useState<Receita[]>([])
   const [empresas, setEmpresas]   = useState<{ id: string; nome: string }[]>([])
+  const [asaas, setAsaas] = useState<{ configurado: boolean; recebidas: number } | null>(null)
   const [loading, setLoading]     = useState(true)
   const [modal, setModal]         = useState(false)
   const [editing, setEditing]     = useState<Receita | null>(null)
@@ -430,6 +432,7 @@ export default function ReceitasPage() {
       supabase.from('empresas').select('id, razao_social, nome_fantasia')
         .eq('tipo', 'propria').eq('ativa', true).order('razao_social'),
     ])
+    setAsaas(await statusAsaas())
     if (error) console.error('[receitas] fetch:', error)
     setEmpresas((emp ?? []).map(e => ({ id: e.id, nome: e.nome_fantasia || e.razao_social })))
     setReceitas((data as Receita[]) ?? [])
@@ -596,7 +599,9 @@ export default function ReceitasPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Receitas</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              Recebimentos automáticos via Asaas + lançamentos manuais avulsos.
+              {asaas && !asaas.configurado
+                ? 'Lançamento manual. A entrada automática do Asaas está desligada.'
+                : 'Recebimentos automáticos via Asaas + lançamentos manuais avulsos.'}
             </p>
           </div>
           <button onClick={openNova}
@@ -604,6 +609,25 @@ export default function ReceitasPage() {
             + Nova Receita
           </button>
         </div>
+
+        {/* Integração desligada: o zero em "Via Asaas" precisa ter explicação,
+            senão passa por mês sem venda. */}
+        {asaas && !asaas.configurado && (
+          <div className="bg-amber-950/20 border border-amber-800/40 rounded-xl p-4">
+            <p className="text-sm text-amber-400">
+              <strong>Webhook do Asaas não configurado em produção.</strong>{' '}
+              A variável <code className="text-amber-300">ASAAS_WEBHOOK_TOKEN</code> não existe no
+              ambiente, então a rota recusa todo evento antes mesmo de olhar o token. Nenhum
+              pagamento entra sozinho — o que estiver aqui foi digitado.
+            </p>
+            <p className="text-xs text-amber-600/90 mt-1.5">
+              {asaas.recebidas === 0
+                ? 'Nunca chegou nenhuma receita por essa via.'
+                : `${asaas.recebidas} receita(s) chegaram por ela antes de parar.`}
+              {' '}O &ldquo;Via Asaas&rdquo; abaixo vai ficar zerado enquanto isso valer.
+            </p>
+          </div>
+        )}
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

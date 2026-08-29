@@ -229,12 +229,18 @@ export default function OverviewPage() {
       .map(p => `${p.empresa.nome_fantasia || p.empresa.razao_social} ${p.minhaParticipacaoPct}%`)
       .join(' · ')
     const semMovimento = minhas.every(p => p.recebidoAno === 0 && p.despesaAno === 0)
+    // Despesa lançada e receita zerada dá prejuízo que não existiu. Enquanto a
+    // entrada não for reconciliada, o número precisa vir com essa ressalva —
+    // negativo sem explicação vira decisão errada.
+    const soDespesa = minhas.some(p => p.despesaAno > 0) && minhas.every(p => p.recebidoAno === 0)
     return {
       valor,
       temSociedade: true,
       explicacao: semMovimento
         ? `${detalhe} — sem lançamento atribuído ainda`
-        : detalhe,
+        : soDespesa
+          ? `${detalhe} — só despesa lançada, receita ainda por reconciliar`
+          : detalhe,
     }
   })()
 
