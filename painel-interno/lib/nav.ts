@@ -1,4 +1,4 @@
-﻿/**
+﻿﻿/**
  * Configuração dos grupos de subnavegação.
  * Cada grupo aparece como uma barra de abas no topo da pagina pai e das filhas.
  */
@@ -18,6 +18,8 @@ export const SUBNAV = {
     { href: '/financeiro/custos',    label: 'Custos',    icon: '🧮' },
     { href: '/financeiro/orcamento', label: 'Orçamento', icon: '🎯' },
     { href: '/financeiro/caixa',     label: 'Caixa',     icon: '🏦' },
+    { href: '/financeiro/empresas',  label: 'Empresas',  icon: '🏢' },
+    { href: '/financeiro/dividas',   label: 'Dívidas',   icon: '🔻' },
     { href: '/financeiro/relatorio', label: 'Relatório', icon: '📄' },
   ],
   empresa: [

@@ -23,6 +23,11 @@ export type Despesa = {
   valor_base?: number | null
   // false = assinatura cancelada; o cron de renovação ignora séries inativas
   assinatura_ativa?: boolean
+  // De qual CNPJ nosso a despesa saiu. Nulo nos 228 lançamentos anteriores à
+  // Fase 06, quando só havia uma empresa — atribuir é escolha sua, em
+  // /financeiro/empresas, não um palpite de migration.
+  empresa_id?: string | null
+  projeto_id?: string | null
   created_at: string
   created_by: string
 }
@@ -50,6 +55,9 @@ export type Receita = {
   serie_id?: string | null
   parcela_num?: number | null
   parcela_total?: number | null
+  // Para qual CNPJ nosso a receita entrou.
+  empresa_id?: string | null
+  projeto_id?: string | null
   created_at: string
   updated_at?: string
   created_by?: string

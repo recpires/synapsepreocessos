@@ -174,6 +174,7 @@ const EMPTY_FORM: DespesaInsert = {
   periodicidade: undefined,
   proxima_data: undefined,
   observacao: '',
+  empresa_id: null,
   created_by: 'painel',
 }
 
@@ -193,6 +194,7 @@ function despesaToForm(d: Despesa, opts?: { duplicar?: boolean }): DespesaInsert
     periodicidade: opts?.duplicar ? undefined : d.periodicidade,
     proxima_data: opts?.duplicar ? undefined : d.proxima_data,
     observacao: d.observacao,
+    empresa_id: d.empresa_id ?? null,
     anexo_url: opts?.duplicar ? undefined : d.anexo_url,
     anexo_nome: opts?.duplicar ? undefined : d.anexo_nome,
     internacional: d.internacional ?? false,
@@ -202,10 +204,11 @@ function despesaToForm(d: Despesa, opts?: { duplicar?: boolean }): DespesaInsert
   }
 }
 
-function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAssinatura }: {
+function ModalDespesa({ open, editing, duplicando, empresas, onClose, onSave, onCancelarAssinatura }: {
   open: boolean
   editing: Despesa | null
   duplicando: Despesa | null
+  empresas: { id: string; nome: string }[]
   onClose: () => void
   onSave: (d: DespesaInsert, file: File | undefined, id?: string, qtdContinuo?: number) => Promise<void>
   onCancelarAssinatura: (d: Despesa, cutoff: string) => Promise<void>
@@ -361,6 +364,13 @@ function ModalDespesa({ open, editing, duplicando, onClose, onSave, onCancelarAs
               <select value={form.produto} onChange={e => set('produto', e.target.value)} className={inp}>
                 {PRODUTOS_LISTA.map(p => <option key={p}>{p}</option>)}</select></div>
           </div>
+          {/* De qual CNPJ saiu. Sem isto o resultado por empresa só tem metade:
+              a receita já sabia de qual empresa veio, a despesa não. */}
+          <div><label className={lbl}>Empresa</label>
+            <select value={form.empresa_id ?? ''} onChange={e => set('empresa_id', e.target.value || null)} className={inp}>
+              <option value="">Não atribuída</option>
+              {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+            </select></div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Forma de Pagamento</label>
               <select value={form.forma_pagamento} onChange={e => set('forma_pagamento', e.target.value)} className={inp}>
@@ -1201,6 +1211,7 @@ export default function FinanceiroPage() {
   const supabase = createClient()
 
   const [despesas, setDespesas]   = useState<Despesa[]>([])
+  const [empresas, setEmpresas]   = useState<{ id: string; nome: string }[]>([])
   const [receitas, setReceitas]   = useState<Receita[]>([])
   const [ultimaRenovacao, setUltimaRenovacao] = useState<string | null>(null)
   const [loading, setLoading]     = useState(true)
@@ -1212,11 +1223,15 @@ export default function FinanceiroPage() {
 
   const fetchDespesas = useCallback(async () => {
     setLoading(true)
-    const [{ data: desp }, { data: rec }, { data: log }] = await Promise.all([
+    const [{ data: desp }, { data: rec }, { data: log }, { data: emp }] = await Promise.all([
       supabase.from('despesas').select('*').order('data', { ascending: false }),
       supabase.from('receitas').select('*').order('data', { ascending: false }),
       supabase.from('cron_log').select('executado_em').order('executado_em', { ascending: false }).limit(1),
+      // Só as próprias: despesa sai de um CNPJ nosso, nunca do cliente.
+      supabase.from('empresas').select('id, razao_social, nome_fantasia')
+        .eq('tipo', 'propria').eq('ativa', true).order('razao_social'),
     ])
+    setEmpresas((emp ?? []).map(e => ({ id: e.id, nome: e.nome_fantasia || e.razao_social })))
     setDespesas(desp ?? [])
     setReceitas((rec as Receita[]) ?? [])
     setUltimaRenovacao(log?.[0]?.executado_em ?? null)
@@ -1486,7 +1501,7 @@ export default function FinanceiroPage() {
         )}
       </div>
 
-      <ModalDespesa open={modalOpen} editing={editing} duplicando={duplicando} onClose={closeModal} onSave={handleSave} onCancelarAssinatura={handleCancelarAssinatura} />
+      <ModalDespesa open={modalOpen} editing={editing} duplicando={duplicando} empresas={empresas} onClose={closeModal} onSave={handleSave} onCancelarAssinatura={handleCancelarAssinatura} />
     </PainelShell>
   )
 }

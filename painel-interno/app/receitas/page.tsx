@@ -119,6 +119,7 @@ const formInicial = (): ReceitaInsert => ({
   status: 'recebido',
   origem: 'manual',
   observacao: '',
+  empresa_id: null,
   recorrente: false,
   periodicidade: undefined,
   created_by: 'painel',
@@ -141,6 +142,7 @@ function receitaToForm(r: Receita): ReceitaInsert {
     origem: r.origem,
     origem_id: r.origem_id,
     observacao: r.observacao,
+    empresa_id: r.empresa_id ?? null,
     payload_raw: r.payload_raw,
     recorrente: r.recorrente,
     periodicidade: r.periodicidade,
@@ -148,9 +150,10 @@ function receitaToForm(r: Receita): ReceitaInsert {
   }
 }
 
-function ModalReceita({ open, editing, onClose, onSave }: {
+function ModalReceita({ open, editing, empresas, onClose, onSave }: {
   open: boolean
   editing: Receita | null
+  empresas: { id: string; nome: string }[]
   onClose: () => void
   onSave: (r: ReceitaInsert, id?: string, qtdContinuo?: number) => Promise<void>
 }) {
@@ -276,6 +279,15 @@ function ModalReceita({ open, editing, onClose, onSave }: {
               <input type="text" value={form.cliente ?? ''} onChange={e => set('cliente', e.target.value)}
                 placeholder="Nome ou razão social" className={inp} />
             </div>
+            {/* Para qual CNPJ nosso a receita entrou. É o que fecha o resultado
+                por empresa junto com a despesa. */}
+            <div className="col-span-2">
+              <label className={lbl}>Empresa que recebeu</label>
+              <select value={form.empresa_id ?? ''} onChange={e => set('empresa_id', e.target.value || null)} className={inp}>
+                <option value="">Não atribuída</option>
+                {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              </select>
+            </div>
             <div className="col-span-2">
               <label className={lbl}>Observação — opcional</label>
               <input type="text" value={form.observacao ?? ''} onChange={e => set('observacao', e.target.value)} className={inp} />
@@ -394,6 +406,7 @@ export default function ReceitasPage() {
   const supabase = createClient()
 
   const [receitas, setReceitas]   = useState<Receita[]>([])
+  const [empresas, setEmpresas]   = useState<{ id: string; nome: string }[]>([])
   const [loading, setLoading]     = useState(true)
   const [modal, setModal]         = useState(false)
   const [editing, setEditing]     = useState<Receita | null>(null)
@@ -411,12 +424,14 @@ export default function ReceitasPage() {
 
   const fetchReceitas = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('receitas')
-      .select('*')
-      .order('data', { ascending: false })
-      .limit(500)
+    const [{ data, error }, { data: emp }] = await Promise.all([
+      supabase.from('receitas').select('*').order('data', { ascending: false }).limit(500),
+      // Só as próprias: quem recebe é um CNPJ nosso, e o cliente vai no campo Cliente.
+      supabase.from('empresas').select('id, razao_social, nome_fantasia')
+        .eq('tipo', 'propria').eq('ativa', true).order('razao_social'),
+    ])
     if (error) console.error('[receitas] fetch:', error)
+    setEmpresas((emp ?? []).map(e => ({ id: e.id, nome: e.nome_fantasia || e.razao_social })))
     setReceitas((data as Receita[]) ?? [])
     setLoading(false)
   }, [supabase])
@@ -768,7 +783,7 @@ export default function ReceitasPage() {
         </div>
       </div>
 
-      <ModalReceita open={modal} editing={editing} onClose={closeModal} onSave={handleSave} />
+      <ModalReceita open={modal} editing={editing} empresas={empresas} onClose={closeModal} onSave={handleSave} />
     </PainelShell>
   )
 }
