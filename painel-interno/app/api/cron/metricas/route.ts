@@ -94,17 +94,27 @@ export async function GET(req: NextRequest) {
     })
   } else falhas.push({ slug: 'crm-nexio', erro: nexio.error ?? 'desconhecido' })
 
-  if (coletas.length === 0) {
-    return NextResponse.json(
-      { error: 'Nenhum produto respondeu.', falhas }, { status: 502 }
-    )
-  }
-
   const sb = clienteAdmin()
-  const { data: produtos, error: eProd } = await sb.from('produtos').select('id, slug')
+  const { data: produtos, error: eProd } = await sb.from('produtos').select('id, slug, status')
   if (eProd) return NextResponse.json({ error: eProd.message }, { status: 500 })
 
   const idPorSlug = new Map((produtos ?? []).map(p => [p.slug as string, p.id as string]))
+  const pausados = new Set(
+    (produtos ?? []).filter(p => p.status === 'pausado').map(p => p.slug as string)
+  )
+
+  // Produto em pausa costuma estar com o serviço desligado, então a falha é
+  // esperada e não deve virar ruído todo mês. Ainda assim a coleta é tentada:
+  // um produto pausado que responde tem dado real, e ignorá-lo perderia
+  // histórico — o Kubic é justamente esse caso.
+  const esperadas = falhas.filter(f => pausados.has(f.slug))
+  const inesperadas = falhas.filter(f => !pausados.has(f.slug))
+
+  if (coletas.length === 0) {
+    return NextResponse.json(
+      { error: 'Nenhum produto respondeu.', inesperadas, esperadas }, { status: 502 }
+    )
+  }
 
   // Mês anterior, para calcular novos, cancelados e churn sem gravar
   // número que a série já consegue derivar sozinha.
@@ -142,13 +152,18 @@ export async function GET(req: NextRequest) {
   const { error } = await sb
     .from('metricas_saas')
     .upsert(linhas, { onConflict: 'produto_id,competencia' })
-  if (error) return NextResponse.json({ error: error.message, falhas }, { status: 500 })
+  if (error) {
+    return NextResponse.json({ error: error.message, inesperadas, esperadas }, { status: 500 })
+  }
 
   return NextResponse.json({
     ok: true,
     competencia,
     gravados: linhas.length,
     mrr_total: Math.round(linhas.reduce((a, l) => a + l.mrr, 0) * 100) / 100,
-    falhas,
+    // Só as inesperadas pedem ação. As esperadas ficam listadas para o
+    // silêncio ser explícito, não acidental.
+    inesperadas,
+    esperadas: esperadas.map(f => f.slug),
   })
 }
