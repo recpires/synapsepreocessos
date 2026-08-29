@@ -1,14 +1,24 @@
 import PainelShell from '@/components/PainelShell'
 import { PageHeader, Erro, Metrica } from '@/components/ui'
 import { obterVencimentos } from '@/server/vencimentos'
+import { SeletorEmpresa } from '@/components/SeletorEmpresa'
+import { listarEmpresasProprias } from '@/server/empresa-financeiro'
 import { Lista } from './Lista'
 
 export const dynamic = 'force-dynamic'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export default async function VencimentosPage() {
-  const r = await obterVencimentos()
+export default async function VencimentosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ empresa?: string }>
+}) {
+  const { empresa } = await searchParams
+  const [r, empresas] = await Promise.all([
+    obterVencimentos(empresa),
+    listarEmpresasProprias(),
+  ])
 
   if (!r.data) {
     return (
@@ -29,6 +39,9 @@ export default async function VencimentosPage() {
           titulo="Vencimentos"
           descricao="Contrato, domínio, certificado, imposto, proposta e prazo de projeto — tudo que tem data, num lugar só."
         />
+        <SeletorEmpresa empresas={(empresas.data ?? []).map(e => ({
+          id: e.id, nome: e.nome_fantasia || e.razao_social,
+        }))} />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metrica

@@ -3,11 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { assertMembro } from '@/lib/auth/membro'
+import { porEmpresa } from '@/lib/filtro-empresa'
 
 type Resultado<T> = { data: T; error?: undefined } | { data?: undefined; error: string }
 
 export type Conta = {
   id: string
+  empresa_id: string | null
   nome: string
   banco: string | null
   tipo: string
@@ -18,6 +20,7 @@ export type Conta = {
 
 export type Imposto = {
   id: string
+  empresa_id: string | null
   competencia: string
   tipo: string
   valor: number
@@ -47,7 +50,7 @@ function diasDesde(iso: string) {
   return Math.round((hoje - Date.UTC(a, m - 1, d)) / 86_400_000)
 }
 
-export async function obterCaixa(): Promise<Resultado<Caixa>> {
+export async function obterCaixa(empresaId?: string): Promise<Resultado<Caixa>> {
   try {
     await assertMembro()
     const sb = await createClient()
@@ -55,9 +58,9 @@ export async function obterCaixa(): Promise<Resultado<Caixa>> {
 
     const [{ data: contas, error: e1 }, { data: impostos, error: e2 }, { data: despesas }] =
       await Promise.all([
-        sb.from('contas_bancarias').select('*').order('nome'),
-        sb.from('impostos').select('*').order('vencimento'),
-        sb.from('despesas').select('data, valor').lt('data', hoje),
+        porEmpresa(sb.from('contas_bancarias').select('*').order('nome'), empresaId),
+        porEmpresa(sb.from('impostos').select('*').order('vencimento'), empresaId),
+        porEmpresa(sb.from('despesas').select('data, valor').lt('data', hoje), empresaId),
       ])
     if (e1) return { error: `contas: ${e1.message}` }
     if (e2) return { error: `impostos: ${e2.message}` }
@@ -104,6 +107,7 @@ export async function obterCaixa(): Promise<Resultado<Caixa>> {
 
 export async function salvarConta(dados: {
   id?: string
+  empresa_id?: string | null
   nome: string
   banco?: string
   tipo: string
@@ -120,6 +124,7 @@ export async function salvarConta(dados: {
     // Toda gravação de saldo carimba a data: é o que permite avisar quando envelhece.
     const linha = {
       nome,
+      empresa_id: dados.empresa_id || null,
       banco: dados.banco?.trim() || null,
       tipo: dados.tipo,
       saldo_atual: dados.saldo_atual,
@@ -140,6 +145,7 @@ export async function salvarConta(dados: {
 
 export async function salvarImposto(dados: {
   id?: string
+  empresa_id?: string | null
   competencia: string
   tipo: string
   valor: number
@@ -157,6 +163,7 @@ export async function salvarImposto(dados: {
 
     const linha = {
       competencia: dados.competencia,
+      empresa_id: dados.empresa_id || null,
       tipo: dados.tipo,
       valor: dados.valor,
       vencimento: dados.vencimento,

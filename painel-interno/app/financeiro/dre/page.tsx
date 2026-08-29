@@ -1,5 +1,7 @@
 import PainelShell from '@/components/PainelShell'
 import SubNav from '@/components/SubNav'
+import { SeletorEmpresa } from '@/components/SeletorEmpresa'
+import { listarEmpresasProprias } from '@/server/empresa-financeiro'
 import { SUBNAV } from '@/lib/nav'
 import { PageHeader, Erro, Metrica, Card, CardHeader, CardBody } from '@/components/ui'
 import { montarDRE, montarFluxo, montarRentabilidade } from '@/server/dre'
@@ -14,15 +16,17 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 export default async function DrePage({
   searchParams,
 }: {
-  searchParams: Promise<{ ano?: string }>
+  searchParams: Promise<{ ano?: string; empresa?: string }>
 }) {
   const sp = await searchParams
   const ano = Number(sp.ano) || new Date().getFullYear()
+  const empresa = sp.empresa
 
-  const [dre, fluxo, rent] = await Promise.all([
-    montarDRE(`${ano}-01-01`, `${ano + 1}-01-01`),
-    montarFluxo(12),
-    montarRentabilidade(),
+  const [dre, fluxo, rent, empresas] = await Promise.all([
+    montarDRE(`${ano}-01-01`, `${ano + 1}-01-01`, empresa),
+    montarFluxo(12, empresa),
+    montarRentabilidade(120, empresa),
+    listarEmpresasProprias(),
   ])
 
   if (!dre.data) {
@@ -43,6 +47,9 @@ export default async function DrePage({
           descricao="Da receita bruta ao resultado, com o caixa projetado e a margem por projeto."
         />
         <SubNav tabs={SUBNAV.financeiro} />
+        <SeletorEmpresa empresas={(empresas.data ?? []).map(e => ({
+          id: e.id, nome: e.nome_fantasia || e.razao_social,
+        }))} />
 
         {d.avisos.length > 0 && (
           <Card className="border-warn-line bg-warn-soft">

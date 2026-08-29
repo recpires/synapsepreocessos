@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { assertMembro } from '@/lib/auth/membro'
+import { porEmpresa } from '@/lib/filtro-empresa'
 
 type Resultado<T> = { data: T; error?: undefined } | { data?: undefined; error: string }
 
@@ -67,7 +68,8 @@ function deslocarMes(iso: string, n: number) {
 
 export async function montarRelatorio(
   inicio: string,
-  fim: string
+  fim: string,
+  empresaId?: string
 ): Promise<Resultado<Relatorio>> {
   try {
     await assertMembro()
@@ -93,15 +95,20 @@ export async function montarRelatorio(
       { data: contas },
       { data: todasDespesas },
     ] = await Promise.all([
-      sb.from('despesas').select('data, descricao, categoria, valor, recorrente, periodicidade, produto')
-        .gte('data', inicio).lt('data', fim).order('valor', { ascending: false }),
-      sb.from('receitas').select('valor').gte('data', inicio).lt('data', fim)
-        .in('status', ['recebido', 'confirmado']),
-      sb.from('despesas').select('categoria, valor').gte('data', antInicio).lt('data', antFim),
+      porEmpresa(sb.from('despesas')
+        .select('data, descricao, categoria, valor, recorrente, periodicidade, produto')
+        .gte('data', inicio).lt('data', fim).order('valor', { ascending: false }), empresaId),
+      porEmpresa(sb.from('receitas').select('valor').gte('data', inicio).lt('data', fim)
+        .in('status', ['recebido', 'confirmado']), empresaId),
+      porEmpresa(sb.from('despesas').select('categoria, valor')
+        .gte('data', antInicio).lt('data', antFim), empresaId),
+      // `custo_por_produto` agrega despesas por produto e não carrega a
+      // empresa. Fica consolidada até a view ganhar a coluna — o relatório
+      // avisa quando está filtrado para o número não passar por segmentado.
       sb.from('custo_por_produto').select('*').gte('data', inicio).lt('data', fim),
       sb.from('produtos').select('id, nome'),
-      sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true),
-      sb.from('despesas').select('data, valor'),
+      porEmpresa(sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true), empresaId),
+      porEmpresa(sb.from('despesas').select('data, valor'), empresaId),
     ])
     if (e1) return { error: `despesas: ${e1.message}` }
 

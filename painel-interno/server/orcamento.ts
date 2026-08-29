@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { assertMembro } from '@/lib/auth/membro'
+import { porEmpresa } from '@/lib/filtro-empresa'
 
 type Resultado<T> = { data: T; error?: undefined } | { data?: undefined; error: string }
 
@@ -25,7 +26,9 @@ export type Orcamento = {
   semPrevisao: string[]
 }
 
-export async function obterOrcamento(ano: number, mes: number): Promise<Resultado<Orcamento>> {
+export async function obterOrcamento(
+  ano: number, mes: number, empresaId?: string
+): Promise<Resultado<Orcamento>> {
   try {
     await assertMembro()
     const sb = await createClient()
@@ -35,7 +38,8 @@ export async function obterOrcamento(ano: number, mes: number): Promise<Resultad
 
     const [{ data: previstos, error: e1 }, { data: despesas, error: e2 }] = await Promise.all([
       sb.from('orcamentos').select('categoria, valor_previsto').eq('ano', ano).eq('mes', mes),
-      sb.from('despesas').select('categoria, valor').gte('data', inicio).lt('data', fim),
+      porEmpresa(sb.from('despesas').select('categoria, valor')
+        .gte('data', inicio).lt('data', fim), empresaId),
     ])
     if (e1) return { error: `orcamentos: ${e1.message}` }
     if (e2) return { error: `despesas: ${e2.message}` }

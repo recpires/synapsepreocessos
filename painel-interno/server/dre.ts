@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { assertMembro } from '@/lib/auth/membro'
+import { porEmpresa } from '@/lib/filtro-empresa'
 
 type Resultado<T> = { data: T; error?: undefined } | { data?: undefined; error: string }
 
@@ -36,7 +37,9 @@ export type DRE = {
   avisos: string[]
 }
 
-export async function montarDRE(inicio: string, fim: string): Promise<Resultado<DRE>> {
+export async function montarDRE(
+  inicio: string, fim: string, empresaId?: string
+): Promise<Resultado<DRE>> {
   try {
     await assertMembro()
     const sb = await createClient()
@@ -49,10 +52,12 @@ export async function montarDRE(inicio: string, fim: string): Promise<Resultado<
 
     const [{ data: receitas, error: e1 }, { data: despesas, error: e2 }, { data: impostos }] =
       await Promise.all([
-        sb.from('receitas').select('valor, tipo, categoria, status')
-          .gte('data', inicio).lt('data', corte),
-        sb.from('despesas').select('valor, categoria').gte('data', inicio).lt('data', corte),
-        sb.from('impostos').select('valor').gte('competencia', inicio).lt('competencia', corte),
+        porEmpresa(sb.from('receitas').select('valor, tipo, categoria, status')
+          .gte('data', inicio).lt('data', corte), empresaId),
+        porEmpresa(sb.from('despesas').select('valor, categoria')
+          .gte('data', inicio).lt('data', corte), empresaId),
+        porEmpresa(sb.from('impostos').select('valor')
+          .gte('competencia', inicio).lt('competencia', corte), empresaId),
       ])
     if (e1) return { error: `receitas: ${e1.message}` }
     if (e2) return { error: `despesas: ${e2.message}` }
@@ -162,7 +167,9 @@ export type Fluxo = {
   temSaldo: boolean
 }
 
-export async function montarFluxo(mesesAdiante = 12): Promise<Resultado<Fluxo>> {
+export async function montarFluxo(
+  mesesAdiante = 12, empresaId?: string
+): Promise<Resultado<Fluxo>> {
   try {
     await assertMembro()
     const sb = await createClient()
@@ -175,11 +182,14 @@ export async function montarFluxo(mesesAdiante = 12): Promise<Resultado<Fluxo>> 
 
     const [{ data: despesas, error: e1 }, { data: receitas }, { data: contas }, { data: impostos }] =
       await Promise.all([
-        sb.from('despesas').select('data, valor').gte('data', inicio).lt('data', fim),
-        sb.from('receitas').select('data, valor, status').gte('data', inicio).lt('data', fim),
-        sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true),
-        sb.from('impostos').select('vencimento, valor').is('pago_em', null)
-          .gte('vencimento', inicio).lt('vencimento', fim),
+        porEmpresa(sb.from('despesas').select('data, valor')
+          .gte('data', inicio).lt('data', fim), empresaId),
+        porEmpresa(sb.from('receitas').select('data, valor, status')
+          .gte('data', inicio).lt('data', fim), empresaId),
+        porEmpresa(sb.from('contas_bancarias').select('saldo_atual')
+          .eq('ativa', true), empresaId),
+        porEmpresa(sb.from('impostos').select('vencimento, valor').is('pago_em', null)
+          .gte('vencimento', inicio).lt('vencimento', fim), empresaId),
       ])
     if (e1) return { error: `despesas: ${e1.message}` }
 
@@ -251,7 +261,7 @@ export type LinhaRentabilidade = {
 }
 
 export async function montarRentabilidade(
-  custoHora = 120
+  custoHora = 120, empresaId?: string
 ): Promise<Resultado<LinhaRentabilidade[]>> {
   try {
     await assertMembro()
@@ -259,10 +269,15 @@ export async function montarRentabilidade(
 
     const [{ data: projetos, error: e1 }, { data: receitas }, { data: despesas }, { data: apontamentos }] =
       await Promise.all([
+        // Projeto filtra pela empresa cliente; receita e despesa, pela nossa.
+        // São colunas homônimas com sentidos diferentes, e é por isso que o
+        // filtro do projeto fica de fora aqui.
         sb.from('projetos').select('id, nome, valor_contratado, empresas(razao_social)')
           .eq('arquivado', false),
-        sb.from('receitas').select('projeto_id, valor, status').not('projeto_id', 'is', null),
-        sb.from('despesas').select('projeto_id, valor').not('projeto_id', 'is', null),
+        porEmpresa(sb.from('receitas').select('projeto_id, valor, status')
+          .not('projeto_id', 'is', null), empresaId),
+        porEmpresa(sb.from('despesas').select('projeto_id, valor')
+          .not('projeto_id', 'is', null), empresaId),
         sb.from('apontamentos').select('projeto_id, horas'),
       ])
     if (e1) return { error: `projetos: ${e1.message}` }

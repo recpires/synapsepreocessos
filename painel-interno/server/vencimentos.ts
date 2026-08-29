@@ -32,15 +32,23 @@ export type PainelVencimentos = {
   aPagar30: number
 }
 
-export async function obterVencimentos(): Promise<Resultado<PainelVencimentos>> {
+export async function obterVencimentos(empresaId?: string): Promise<Resultado<PainelVencimentos>> {
   try {
     await assertMembro()
     const sb = await createClient()
 
-    const { data, error } = await sb
-      .from('vencimentos')
-      .select('*')
-      .order('vence_em')
+    // `empresa_id` na view é "qual empresa nossa responde por isto", e só
+    // imposto e dívida sabem disso. Domínio, SSL, contrato, proposta e prazo
+    // de projeto vêm com null porque a coluna de origem guarda a contraparte,
+    // não a nossa empresa.
+    //
+    // Por isso o filtro inclui os nulos: um domínio que expira interessa
+    // qualquer que seja o recorte, e vencimento que some da tela é pior que
+    // vencimento sem dono.
+    const base = sb.from('vencimentos').select('*').order('vence_em')
+    const { data, error } = await (empresaId
+      ? base.or(`empresa_id.eq.${empresaId},empresa_id.is.null`)
+      : base)
     if (error) return { error: `vencimentos: ${error.message}` }
 
     const itens = (data ?? []).map(v => ({

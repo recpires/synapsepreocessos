@@ -56,7 +56,7 @@ function Grafico({ serie }: { serie: Relatorio['serie'] }) {
   )
 }
 
-export function Documento({ r }: { r: Relatorio }) {
+export function Documento({ r, escopo }: { r: Relatorio; escopo?: string | null }) {
   const temProjetado = r.serie.some(s => s.projetado > 0)
 
   return (
@@ -76,8 +76,10 @@ export function Documento({ r }: { r: Relatorio }) {
           <div className="mb-6 flex items-center gap-3">
             <Image src="/logo.png" alt="" width={36} height={36} className="rounded-lg" />
             <div>
-              <div className="text-sm font-semibold">Synapse Code</div>
-              <div className="text-xs text-subtle">Relatório financeiro</div>
+              <div className="text-sm font-semibold">{escopo ?? 'Synapse Code'}</div>
+              <div className="text-xs text-subtle">
+                {escopo ? 'Relatório financeiro da empresa' : 'Relatório financeiro consolidado'}
+              </div>
             </div>
           </div>
           <h1 className="text-3xl font-bold tracking-tight">{r.periodo.rotulo}</h1>

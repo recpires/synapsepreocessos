@@ -1,5 +1,6 @@
 import { Erro } from '@/components/ui'
 import { montarRelatorio } from '@/server/relatorio'
+import { listarEmpresasProprias } from '@/server/empresa-financeiro'
 import { Documento } from './Documento'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export default async function RelatorioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ inicio?: string; fim?: string }>
+  searchParams: Promise<{ inicio?: string; fim?: string; empresa?: string }>
 }) {
   const sp = await searchParams
   const agora = new Date()
@@ -20,7 +21,15 @@ export default async function RelatorioPage({
   const inicio = sp.inicio ?? `${agora.getFullYear()}-01-01`
   const fim = sp.fim ?? `${agora.getFullYear()}-${String(agora.getMonth() + 2).padStart(2, '0')}-01`
 
-  const relatorio = await montarRelatorio(inicio, fim)
+  const [relatorio, empresas] = await Promise.all([
+    montarRelatorio(inicio, fim, sp.empresa),
+    listarEmpresasProprias(),
+  ])
+
+  // O documento é o que sai no PDF: precisa dizer de qual empresa ele fala,
+  // senão um relatório de um CNPJ passa por consolidado na mão de terceiro.
+  const emp = (empresas.data ?? []).find(e => e.id === sp.empresa)
+  const escopo = emp ? (emp.nome_fantasia || emp.razao_social) : null
 
   if (!relatorio.data) {
     return (
@@ -30,5 +39,5 @@ export default async function RelatorioPage({
     )
   }
 
-  return <Documento r={relatorio.data} />
+  return <Documento r={relatorio.data} escopo={escopo} />
 }

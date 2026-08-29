@@ -20,11 +20,13 @@ function diasDesde(iso: string) {
 /** Fora do componente pai: definir componente durante o render remonta o form a cada tecla. */
 function Formulario({
   conta,
+  empresas,
   salvando,
   aoEnviar,
   aoCancelar,
 }: {
   conta?: Conta
+  empresas: { id: string; nome: string }[]
   salvando: boolean
   aoEnviar: (form: FormData, id?: string) => void
   aoCancelar: () => void
@@ -35,6 +37,17 @@ function Formulario({
       <Input name="banco" rotulo="Banco" defaultValue={conta?.banco ?? ''} placeholder="Santander" />
       <Select name="tipo" rotulo="Tipo" defaultValue={conta?.tipo ?? 'corrente'}>
         {TIPOS_CONTA.map(t => <option key={t} value={t}>{LABEL_TIPO_CONTA[t]}</option>)}
+      </Select>
+      {/* O saldo de uma empresa não paga a conta da outra: sem dono, a conta
+          entra em todo recorte e mostra folga que aquele CNPJ não tem. */}
+      <Select
+        name="empresa_id"
+        rotulo="Empresa"
+        defaultValue={conta?.empresa_id ?? ''}
+        dica={empresas.length > 1 ? undefined : 'Cadastre mais de uma empresa para separar.'}
+      >
+        <option value="">Não atribuída</option>
+        {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
       </Select>
       <Input
         name="saldo_atual"
@@ -52,7 +65,9 @@ function Formulario({
   )
 }
 
-export function Contas({ contas }: { contas: Conta[] }) {
+export function Contas({
+  contas, empresas,
+}: { contas: Conta[]; empresas: { id: string; nome: string }[] }) {
   const router = useRouter()
   const [editando, setEditando] = useState<string | 'nova' | null>(null)
   const [salvando, iniciar] = useTransition()
@@ -68,6 +83,7 @@ export function Contas({ contas }: { contas: Conta[] }) {
     iniciar(async () => {
       const r = await salvarConta({
         id,
+        empresa_id: String(form.get('empresa_id') ?? '') || null,
         nome: String(form.get('nome') ?? ''),
         banco: String(form.get('banco') ?? '') || undefined,
         tipo: String(form.get('tipo') ?? 'corrente'),
@@ -98,7 +114,7 @@ export function Contas({ contas }: { contas: Conta[] }) {
           return (
             <li key={c.id} className="rounded-token border border-line bg-surface-2 p-3">
               {editando === c.id ? (
-                <Formulario
+                <Formulario empresas={empresas}
                   conta={c}
                   salvando={salvando}
                   aoEnviar={gravar}
@@ -134,7 +150,7 @@ export function Contas({ contas }: { contas: Conta[] }) {
 
       {editando === 'nova' ? (
         <div className="rounded-token border border-line bg-surface-2 p-3">
-          <Formulario
+          <Formulario empresas={empresas}
             salvando={salvando}
             aoEnviar={gravar}
             aoCancelar={() => setEditando(null)}

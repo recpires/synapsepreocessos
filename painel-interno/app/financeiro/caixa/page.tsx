@@ -1,5 +1,7 @@
 import PainelShell from '@/components/PainelShell'
 import SubNav from '@/components/SubNav'
+import { SeletorEmpresa } from '@/components/SeletorEmpresa'
+import { listarEmpresasProprias } from '@/server/empresa-financeiro'
 import { SUBNAV } from '@/lib/nav'
 import { PageHeader, Erro, Metrica, Card, CardHeader, CardBody } from '@/components/ui'
 import { obterCaixa } from '@/server/caixa'
@@ -10,8 +12,16 @@ export const dynamic = 'force-dynamic'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export default async function CaixaPage() {
-  const caixa = await obterCaixa()
+export default async function CaixaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ empresa?: string }>
+}) {
+  const { empresa } = await searchParams
+  const [caixa, empresas] = await Promise.all([
+    obterCaixa(empresa),
+    listarEmpresasProprias(),
+  ])
 
   if (!caixa.data) {
     return (
@@ -24,6 +34,9 @@ export default async function CaixaPage() {
   }
 
   const c = caixa.data
+  const listaEmpresas = (empresas.data ?? []).map(e => ({
+    id: e.id, nome: e.nome_fantasia || e.razao_social,
+  }))
   const velho = c.saldoDesatualizadoHa !== null && c.saldoDesatualizadoHa > 7
 
   return (
@@ -34,6 +47,7 @@ export default async function CaixaPage() {
           descricao="Saldo das contas, quanto tempo ele dura e o que o governo espera receber."
         />
         <SubNav tabs={SUBNAV.financeiro} />
+        <SeletorEmpresa empresas={listaEmpresas} />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metrica
@@ -80,12 +94,12 @@ export default async function CaixaPage() {
               titulo="Contas"
               descricao="O saldo é informado por você. O painel não conecta no banco."
             />
-            <CardBody><Contas contas={c.contas} /></CardBody>
+            <CardBody><Contas contas={c.contas} empresas={listaEmpresas} /></CardBody>
           </Card>
 
           <Card>
             <CardHeader titulo="Impostos" descricao="Competência, vencimento e baixa." />
-            <CardBody><Impostos impostos={c.impostos} /></CardBody>
+            <CardBody><Impostos impostos={c.impostos} empresas={listaEmpresas} /></CardBody>
           </Card>
         </div>
       </div>

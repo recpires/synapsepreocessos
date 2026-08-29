@@ -1,5 +1,7 @@
 import PainelShell from '@/components/PainelShell'
 import SubNav from '@/components/SubNav'
+import { SeletorEmpresa } from '@/components/SeletorEmpresa'
+import { listarEmpresasProprias } from '@/server/empresa-financeiro'
 import { SUBNAV } from '@/lib/nav'
 import { PageHeader, Erro, Metrica, Card, CardHeader, CardBody } from '@/components/ui'
 import {
@@ -12,12 +14,18 @@ export const dynamic = 'force-dynamic'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export default async function CustosPage() {
-  const [panorama, regras, produtos, semDono] = await Promise.all([
-    obterPanoramaCustos(),
-    listarRegrasRateio(),
+export default async function CustosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ empresa?: string }>
+}) {
+  const { empresa } = await searchParams
+  const [panorama, regras, produtos, semDono, empresas] = await Promise.all([
+    obterPanoramaCustos(empresa),
+    listarRegrasRateio(empresa),
     listarProdutosSimples(),
-    listarSemDono(),
+    listarSemDono(empresa),
+    listarEmpresasProprias(),
   ])
 
   // Guard por `data`, não por `error`: é o que o TypeScript consegue estreitar.
@@ -45,6 +53,9 @@ export default async function CustosPage() {
           descricao="Quanto cada SaaS custa de verdade — o direto mais a fatia da infra compartilhada."
         />
         <SubNav tabs={SUBNAV.financeiro} />
+        <SeletorEmpresa empresas={(empresas.data ?? []).map(e => ({
+          id: e.id, nome: e.nome_fantasia || e.razao_social,
+        }))} />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metrica

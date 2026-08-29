@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { assertMembro } from '@/lib/auth/membro'
+import { porEmpresa } from '@/lib/filtro-empresa'
 
 type Resultado<T> = { data: T; error?: undefined } | { data?: undefined; error: string }
 
@@ -51,7 +52,9 @@ export type PanoramaCustos = {
 
 // ── Rateio ───────────────────────────────────────────────────────────────────
 
-export async function listarRegrasRateio(): Promise<Resultado<RegraRateio[]>> {
+export async function listarRegrasRateio(
+  empresaId?: string
+): Promise<Resultado<RegraRateio[]>> {
   try {
     await assertMembro()
     const sb = await createClient()
@@ -61,7 +64,8 @@ export async function listarRegrasRateio(): Promise<Resultado<RegraRateio[]>> {
         sb.from('rateio_regras').select('*').order('nome'),
         sb.from('rateio_itens').select('*'),
         sb.from('produtos').select('id, nome'),
-        sb.from('despesas').select('descricao, categoria, valor, produto').lt('data', hojeISO()),
+        porEmpresa(sb.from('despesas').select('descricao, categoria, valor, produto')
+          .lt('data', hojeISO()), empresaId),
       ])
     if (e1) return { error: `regras: ${e1.message}` }
 
@@ -167,7 +171,7 @@ export async function removerRegraRateio(id: string): Promise<{ ok: boolean; err
 
 // ── Panorama de custos ───────────────────────────────────────────────────────
 
-export async function obterPanoramaCustos(): Promise<Resultado<PanoramaCustos>> {
+export async function obterPanoramaCustos(empresaId?: string): Promise<Resultado<PanoramaCustos>> {
   try {
     await assertMembro()
     const sb = await createClient()
@@ -177,8 +181,8 @@ export async function obterPanoramaCustos(): Promise<Resultado<PanoramaCustos>> 
       await Promise.all([
         sb.from('custo_por_produto').select('*').lt('data', hoje),
         sb.from('produtos').select('id, nome').order('ordem'),
-        sb.from('despesas').select('data, valor, produto').lt('data', hoje),
-        sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true),
+        porEmpresa(sb.from('despesas').select('data, valor, produto').lt('data', hoje), empresaId),
+        porEmpresa(sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true), empresaId),
       ])
     if (e1) return { error: `custo_por_produto: ${e1.message}` }
 
@@ -253,7 +257,7 @@ export async function listarProdutosSimples(): Promise<Resultado<{ id: string; n
 }
 
 /** As maiores despesas ainda sem produto — a fila do que ratear em seguida. */
-export async function listarSemDono(): Promise<Resultado<
+export async function listarSemDono(empresaId?: string): Promise<Resultado<
   { descricao: string; categoria: string; total: number; lancamentos: number }[]
 >> {
   try {
@@ -261,7 +265,8 @@ export async function listarSemDono(): Promise<Resultado<
     const sb = await createClient()
 
     const [{ data: despesas, error }, { data: regras }, { data: itens }] = await Promise.all([
-      sb.from('despesas').select('descricao, categoria, valor, produto').lt('data', hojeISO()),
+      porEmpresa(sb.from('despesas').select('descricao, categoria, valor, produto')
+        .lt('data', hojeISO()), empresaId),
       sb.from('rateio_regras').select('id, aplica_a, padrao, ativa').eq('ativa', true),
       sb.from('rateio_itens').select('regra_id, percentual'),
     ])

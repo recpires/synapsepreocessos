@@ -23,7 +23,9 @@ function diasAte(iso: string) {
   return Math.round((Date.UTC(a, m - 1, d) - zero) / 86_400_000)
 }
 
-export function Impostos({ impostos }: { impostos: Imposto[] }) {
+export function Impostos({
+  impostos, empresas,
+}: { impostos: Imposto[]; empresas: { id: string; nome: string }[] }) {
   const router = useRouter()
   const [novo, setNovo] = useState(false)
   const [mostrarPagos, setMostrarPagos] = useState(false)
@@ -39,6 +41,8 @@ export function Impostos({ impostos }: { impostos: Imposto[] }) {
       const r = await salvarImposto({
         // A competência é um mês; o dia 01 padroniza o armazenamento.
         competencia: `${String(form.get('competencia') ?? '')}-01`,
+        // DAS é apurado por CNPJ: imposto sem empresa entra no caixa de todas.
+        empresa_id: String(form.get('empresa_id') ?? '') || null,
         tipo: String(form.get('tipo') ?? 'Outro'),
         valor: Number(bruto),
         vencimento: String(form.get('vencimento') ?? ''),
@@ -134,6 +138,10 @@ export function Impostos({ impostos }: { impostos: Imposto[] }) {
           </Select>
           <Input name="valor" rotulo="Valor" inputMode="decimal" placeholder="0,00" />
           <Input name="competencia" rotulo="Competência" type="month" />
+          <Select name="empresa_id" rotulo="Empresa" defaultValue="">
+            <option value="">Não atribuída</option>
+            {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+          </Select>
           <Input name="vencimento" rotulo="Vencimento" type="date" />
           <Input name="observacao" rotulo="Observação" className="sm:col-span-2" />
           <div className="flex gap-2 sm:col-span-2">
