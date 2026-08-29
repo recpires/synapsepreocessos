@@ -3,17 +3,21 @@ import PainelShell from '@/components/PainelShell'
 import SubNav from '@/components/SubNav'
 import { SUBNAV } from '@/lib/nav'
 import {
-  PageHeader, Erro, Card, CardBody, Badge, Vazio, Tabela, Th, Td, Tr,
+  PageHeader, Erro, Card, CardHeader, CardBody, Badge, Vazio, Tabela, Th, Td, Tr,
 } from '@/components/ui'
-import { listarPosicoes } from '@/server/empresa-financeiro'
+import { listarPosicoes, contarSemEmpresa } from '@/server/empresa-financeiro'
 import { REGIME_LABEL } from '@/types/empresa-financeiro'
+import { Atribuir } from './Atribuir'
 
 export const dynamic = 'force-dynamic'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 export default async function EmpresasFinanceiroPage() {
-  const { data: posicoes, error } = await listarPosicoes()
+  const [{ data: posicoes, error }, { data: pendencia }] = await Promise.all([
+    listarPosicoes(),
+    contarSemEmpresa(),
+  ])
 
   const totalFaturado = (posicoes ?? []).reduce((a, p) => a + p.faturadoAno, 0)
   const totalDevedor = (posicoes ?? []).reduce((a, p) => a + p.saldoDevedor, 0)
@@ -114,6 +118,21 @@ export default async function EmpresasFinanceiroPage() {
                 </tbody>
               </Tabela>
             </Card>
+
+            {pendencia && (pendencia.despesas > 0 || pendencia.receitas > 0) && (
+              <Card>
+                <CardHeader
+                  titulo="Lançamentos sem empresa"
+                  descricao="Vieram de quando só havia uma entidade. Atribuir é escolha sua, e pode ser refeita."
+                />
+                <CardBody>
+                  <Atribuir
+                    empresas={posicoes.map(p => p.empresa)}
+                    pendencia={pendencia}
+                  />
+                </CardBody>
+              </Card>
+            )}
 
             <Card>
               <CardBody className="text-xs text-subtle">

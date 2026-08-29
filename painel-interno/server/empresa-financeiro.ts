@@ -494,6 +494,39 @@ export async function alterarStatusDivida(
 
 // ── Atribuição de lançamentos existentes ────────────────────────────────────
 
+/** Quanto ainda está sem dono, e desde quando. É o que a tela precisa mostrar. */
+export async function contarSemEmpresa(): Promise<Resultado<{
+  despesas: number; receitas: number
+  valorDespesas: number; valorReceitas: number
+  maisAntigo: string | null
+}>> {
+  try {
+    await assertMembro()
+    const sb = await createClient()
+
+    const [{ data: desp, error: e1 }, { data: rec, error: e2 }] = await Promise.all([
+      sb.from('despesas').select('data, valor').is('empresa_id', null),
+      sb.from('receitas').select('data, valor').is('empresa_id', null),
+    ])
+    if (e1) return { error: `despesas: ${e1.message}` }
+    if (e2) return { error: `receitas: ${e2.message}` }
+
+    const datas = [...(desp ?? []), ...(rec ?? [])].map(l => l.data as string).sort()
+
+    return {
+      data: {
+        despesas: (desp ?? []).length,
+        receitas: (rec ?? []).length,
+        valorDespesas: centavos((desp ?? []).reduce((a, d) => a + n(d.valor), 0)),
+        valorReceitas: centavos((rec ?? []).reduce((a, r) => a + n(r.valor), 0)),
+        maisAntigo: datas[0] ?? null,
+      },
+    }
+  } catch (e) {
+    return falha('contarSemEmpresa', e)
+  }
+}
+
 /**
  * Aponta despesas ou receitas para uma empresa.
  *
