@@ -52,9 +52,13 @@ jobs:
 
       # Falha se o banco remoto tiver migration que não está no git, ou o
       # contrário. Foi essa divergência que causou o E-03.
+      #
+      # O token aceita os dois nomes: SUPABASE_ACCESS_TOKEN, se criado à mão,
+      # ou o SBP_… que a integração do Supabase com o GitHub gera sozinha.
       - name: Banco e repositório em sincronia
-        run: supabase migration list --linked
+        run: |
+          supabase link --project-ref bdfgmgxajzyjtunetnuw
+          supabase migration list --linked
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: bdfgmgxajzyjtunetnuw
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN || secrets.SBP_177E9E0B904A73294BF7BAEFEA421F99A9D4584E }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
