@@ -179,7 +179,7 @@ export async function obterPanoramaCustos(empresaId?: string): Promise<Resultado
 
     const [{ data: custos, error: e1 }, { data: produtos }, { data: despesas }, { data: contas }] =
       await Promise.all([
-        sb.from('custo_por_produto').select('*').lt('data', hoje),
+        porEmpresa(sb.from('custo_por_produto').select('*').lt('data', hoje), empresaId),
         sb.from('produtos').select('id, nome').order('ordem'),
         porEmpresa(sb.from('despesas').select('data, valor, produto').lt('data', hoje), empresaId),
         porEmpresa(sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true), empresaId),

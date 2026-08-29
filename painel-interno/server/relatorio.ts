@@ -102,10 +102,8 @@ export async function montarRelatorio(
         .in('status', ['recebido', 'confirmado']), empresaId),
       porEmpresa(sb.from('despesas').select('categoria, valor')
         .gte('data', antInicio).lt('data', antFim), empresaId),
-      // `custo_por_produto` agrega despesas por produto e não carrega a
-      // empresa. Fica consolidada até a view ganhar a coluna — o relatório
-      // avisa quando está filtrado para o número não passar por segmentado.
-      sb.from('custo_por_produto').select('*').gte('data', inicio).lt('data', fim),
+      porEmpresa(sb.from('custo_por_produto').select('*')
+        .gte('data', inicio).lt('data', fim), empresaId),
       sb.from('produtos').select('id, nome'),
       porEmpresa(sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true), empresaId),
       porEmpresa(sb.from('despesas').select('data, valor'), empresaId),
