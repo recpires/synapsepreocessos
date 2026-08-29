@@ -299,6 +299,9 @@ export default function OverviewPage() {
     const detalhe = minhas
       .map(p => `${p.empresa.nome_fantasia || p.empresa.razao_social} ${p.minhaParticipacaoPct}%`)
       .join(' · ')
+    // Quando a sociedade mudou no período, o valor não é a porcentagem vezes o
+    // resultado — e sem dizer isso a diferença parece erro de conta.
+    const variou = minhas.some(p => p.participacaoVariou)
     const semMovimento = minhas.every(p => p.recebidoAno === 0 && p.despesaAno === 0)
     // Despesa lançada e receita zerada dá prejuízo que não existiu. Enquanto a
     // entrada não for reconciliada, o número precisa vir com essa ressalva —
@@ -311,7 +314,9 @@ export default function OverviewPage() {
         ? `${detalhe} — sem lançamento atribuído ainda`
         : soDespesa
           ? `${detalhe} — só despesa lançada, receita ainda por reconciliar`
-          : detalhe,
+          : variou
+            ? `${detalhe} — sua participação mudou no período`
+            : detalhe,
     }
   })()
 

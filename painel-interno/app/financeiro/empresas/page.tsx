@@ -99,6 +99,13 @@ export default async function EmpresasFinanceiroPage() {
                               </span>
                               <div className="text-[11px] text-subtle">
                                 {p.minhaParticipacaoPct}%
+                                {p.participacaoVariou && (
+                                  <span
+                                    title="Sua participação mudou dentro do período, então o valor não é a porcentagem de hoje vezes o resultado — cada lançamento foi pesado pela fatia vigente na data dele."
+                                  >
+                                    {' '}· mudou no ano
+                                  </span>
+                                )}
                                 {p.declaradoPct < 99.999 && (
                                   <span
                                     className="text-warn"
@@ -175,6 +182,10 @@ export default async function EmpresasFinanceiroPage() {
                 <strong className="text-muted">Sua parte</strong> é o resultado vezes a sua
                 participação societária, e aparece só nas empresas em que você está declarado
                 como sócio — cada pessoa que abre esta tela vê a própria fatia, não a dos outros.
+                O cálculo é por lançamento, não pelo total do período: quem entrou em maio não
+                leva o que aconteceu em março, e quem saiu em junho não leva o de agosto. Por
+                isso o valor às vezes não é a porcentagem vezes o resultado — quando isso
+                acontece, a linha diz “mudou no ano”.
                 {totalFaturado === 0 && totalDevedor === 0 && (
                   <> Ainda não há nota nem dívida lançada, então a tabela mostra zeros reais.</>
                 )}

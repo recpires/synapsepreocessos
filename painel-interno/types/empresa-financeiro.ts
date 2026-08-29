@@ -180,8 +180,17 @@ export type PosicaoEmpresa = {
    * ainda não dizer.
    */
   minhaParticipacaoPct: number | null
-  /** Resultado do ano vezes a fatia. `null` pelo mesmo motivo acima. */
+  /**
+   * Soma dos lançamentos do período ponderada pela participação vigente na
+   * data de cada um — não é o resultado vezes a fatia de hoje. `null` quando a
+   * pessoa não é sócia declarada.
+   */
   minhaParte: number | null
+  /**
+   * A sociedade mudou dentro da janela. Quando é `true`, `minhaParte` não bate
+   * com `resultadoAno × minhaParticipacaoPct`, e isso é o certo.
+   */
+  participacaoVariou: boolean
   /** Quanto do capital já foi declarado. Menos de 100 = cadastro incompleto. */
   declaradoPct: number
 }

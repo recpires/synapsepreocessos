@@ -15,13 +15,18 @@ type Props = {
   empresaId: string
   socios: Socio[]
   membros: { id: string; nome: string }[]
-  /** Resultado do ano, para mostrar quanto cabe a cada um. */
-  resultadoAno: number
+  /**
+   * Fatia de cada sócio no resultado do ano, já ponderada pela vigência.
+   * Vem pronta do servidor porque depende dos lançamentos, não só da
+   * porcentagem: multiplicar o resultado pela fatia de hoje daria a quem
+   * entrou em maio o que aconteceu em março.
+   */
+  fatias: Record<string, number>
 }
 
 const VAZIO = { nome: '', membro_id: '', participacao_pct: '', papel: '', entrada: '' }
 
-export function Socios({ empresaId, socios, membros, resultadoAno }: Props) {
+export function Socios({ empresaId, socios, membros, fatias }: Props) {
   const [aberto, setAberto] = useState(false)
   const [f, setF] = useState(VAZIO)
   const [salvando, iniciar] = useTransition()
@@ -62,9 +67,9 @@ export function Socios({ empresaId, socios, membros, resultadoAno }: Props) {
     const ok = await confirmar({
       titulo: `Registrar a saída de ${s.nome}?`,
       mensagem:
-        `A participação de ${pct(s.participacao_pct)} deixa de contar e libera essa fatia ` +
-        'para redistribuir. A linha continua gravada — quem era sócio quando o resultado ' +
-        'foi apurado importa depois.',
+        `A participação de ${pct(s.participacao_pct)} deixa de contar a partir de hoje e ` +
+        'libera essa fatia para redistribuir. O que aconteceu antes continua sendo dele: ' +
+        'a conta é feita por data de lançamento, não pela composição atual.',
       confirmLabel: 'Registrar saída',
     })
     if (!ok) return
@@ -113,9 +118,12 @@ export function Socios({ empresaId, socios, membros, resultadoAno }: Props) {
                   <span className="tabular text-sm font-medium text-fg">
                     {pct(s.participacao_pct)}
                   </span>
-                  {resultadoAno !== 0 && (
-                    <span className="tabular text-xs text-subtle">
-                      {brl(Math.round(resultadoAno * s.participacao_pct) / 100)}
+                  {fatias[s.id] !== undefined && fatias[s.id] !== 0 && (
+                    <span
+                      className="tabular text-xs text-subtle"
+                      title="Resultado do ano que cabe a este sócio, contando só o período em que ele é sócio."
+                    >
+                      {brl(fatias[s.id])}
                     </span>
                   )}
                   <button
@@ -183,6 +191,7 @@ export function Socios({ empresaId, socios, membros, resultadoAno }: Props) {
             <Input
               rotulo="Entrada" type="date" value={f.entrada}
               onChange={e => setF({ ...f, entrada: e.target.value })}
+              dica="Sem data, conta como se sempre tivesse sido sócio."
             />
           </div>
           <div className="flex gap-2">

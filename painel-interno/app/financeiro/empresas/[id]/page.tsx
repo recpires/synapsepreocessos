@@ -89,7 +89,9 @@ export default async function EmpresaFinanceiroPage({
             valor={brl(p.resultadoAno)}
             detalhe={
               p.minhaParticipacaoPct !== null
-                ? `${brl(p.minhaParte ?? 0)} é sua (${p.minhaParticipacaoPct}%)`
+                ? `${brl(p.minhaParte ?? 0)} é sua (${p.minhaParticipacaoPct}%${
+                    p.participacaoVariou ? ', mudou no ano' : ''
+                  })`
                 : `${brl(p.despesaAno)} de despesa`
             }
           />
@@ -137,7 +139,7 @@ export default async function EmpresaFinanceiroPage({
               empresaId={id}
               socios={socios.data?.socios ?? []}
               membros={socios.data?.membros ?? []}
-              resultadoAno={p.resultadoAno}
+              fatias={socios.data?.fatias ?? {}}
             />
           </CardBody>
         </Card>

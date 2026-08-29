@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { assertMembro } from '@/lib/auth/membro'
 import { gerarParcelas } from '@/types/empresa-financeiro'
+import { fatiaNoPeriodo, variouNoPeriodo, type Vigencia } from '@/lib/participacao'
 import type {
   EmpresaPropria, PosicaoEmpresa, UsoDoTeto, Socio,
   NotaFiscal, Divida, DividaResumo, Parcela,
@@ -96,12 +97,16 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
       sb.from('teto_faturamento').select('*'),
       sb.from('notas_fiscais').select('empresa_id, valor_servicos, status')
         .gte('competencia', desde).lte('competencia', ate).eq('status', 'emitida'),
-      sb.from('receitas').select('empresa_id, valor, status')
+      sb.from('receitas').select('empresa_id, valor, status, data')
         .gte('data', desde).lte('data', ate),
-      sb.from('despesas').select('empresa_id, valor')
+      sb.from('despesas').select('empresa_id, valor, data')
         .gte('data', desde).lte('data', ate),
       sb.from('dividas_resumo').select('empresa_id, saldo_devedor, parcelas_atrasadas, status'),
-      sb.from('socios').select('empresa_id, membro_id, participacao_pct').is('saida', null),
+      // Inclusive quem já saiu: a fatia é calculada por data, e ignorar o
+      // histórico faria o período anterior à saída sumir da conta.
+      sb.from('socios')
+        .select('empresa_id, membro_id, participacao_pct, entrada, saida')
+        .eq('membro_id', eu.id),
       sb.from('participacao_declarada').select('empresa_id, declarado_pct'),
     ])
     if (e1) return { error: `empresas: ${e1.message}` }
@@ -126,11 +131,34 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
     const porAtraso = somar(ativas, r => r.empresa_id, r => n(r.parcelas_atrasadas))
     const contagemNF = somar(notas, r => r.empresa_id, () => 1)
     const tetoPorEmpresa = new Map((tetos ?? []).map(t => [t.empresa_id as string, t]))
-    const minhaFatia = new Map(
-      (socios ?? [])
-        .filter(x => x.membro_id === eu.id)
-        .map(x => [x.empresa_id as string, n(x.participacao_pct)])
-    )
+    // Vigências minhas, por empresa. Podem ser várias na mesma: quem saiu e
+    // voltou, ou teve a fatia alterada, tem uma linha por período.
+    const minhasVigencias = new Map<string, Vigencia[]>()
+    for (const x of socios ?? []) {
+      const chave = x.empresa_id as string
+      const atual = minhasVigencias.get(chave) ?? []
+      atual.push({
+        participacao_pct: n(x.participacao_pct),
+        entrada: x.entrada as string | null,
+        saida: x.saida as string | null,
+      })
+      minhasVigencias.set(chave, atual)
+    }
+
+    // Movimentos com sinal, para a fatia sair de uma soma só.
+    const movimentosPorEmpresa = new Map<string, { data: string; valor: number }[]>()
+    const empilhar = (id: string | null, data: string, valor: number) => {
+      if (!id) return
+      const atual = movimentosPorEmpresa.get(id) ?? []
+      atual.push({ data, valor })
+      movimentosPorEmpresa.set(id, atual)
+    }
+    for (const r of receitas ?? []) {
+      if (r.status === 'recebido' || r.status === 'confirmado') {
+        empilhar(r.empresa_id, r.data as string, n(r.valor))
+      }
+    }
+    for (const d of despesas ?? []) empilhar(d.empresa_id, d.data as string, -n(d.valor))
     const declaradoPorEmpresa = new Map(
       (declarado ?? []).map(d => [d.empresa_id as string, n(d.declarado_pct)])
     )
@@ -139,6 +167,10 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
       const recebido = centavos(porReceita.get(e.id) ?? 0)
       const gasto = centavos(porDespesa.get(e.id) ?? 0)
       const t = tetoPorEmpresa.get(e.id)
+      const vigencias = minhasVigencias.get(e.id)
+      const pctHoje = vigencias
+        ? vigencias.find(v => v.saida === null)?.participacao_pct ?? 0
+        : 0
       return {
         empresa: {
           ...e,
@@ -159,10 +191,15 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
         saldoDevedor: centavos(porDivida.get(e.id) ?? 0),
         parcelasAtrasadas: porAtraso.get(e.id) ?? 0,
         notas: contagemNF.get(e.id) ?? 0,
-        minhaParticipacaoPct: minhaFatia.get(e.id) ?? null,
-        minhaParte: minhaFatia.has(e.id)
-          ? centavos((recebido - gasto) * (minhaFatia.get(e.id)! / 100))
+        // A porcentagem exibida é a de hoje; a fatia em reais é ponderada
+        // pela vigência de cada lançamento. Quando as duas divergem porque a
+        // sociedade mudou no período, `participacaoVariou` avisa — senão o
+        // usuário confere na calculadora e conclui que a conta está errada.
+        minhaParticipacaoPct: vigencias ? pctHoje : null,
+        minhaParte: vigencias
+          ? fatiaNoPeriodo(vigencias, movimentosPorEmpresa.get(e.id) ?? [])
           : null,
+        participacaoVariou: vigencias ? variouNoPeriodo(vigencias, desde, ate) : false,
         declaradoPct: declaradoPorEmpresa.get(e.id) ?? 0,
       }
     })
@@ -210,24 +247,57 @@ export async function salvarDadosFiscais(dados: {
 export async function listarSocios(empresaId: string): Promise<Resultado<{
   socios: Socio[]
   membros: { id: string; nome: string }[]
+  /** Fatia de cada sócio no resultado do ano, ponderada por vigência. */
+  fatias: Record<string, number>
 }>> {
   try {
     await assertMembro()
     const sb = await createClient()
+    const desde = inicioDoAno()
+    const ate = hojeISO()
 
-    const [{ data: socios, error }, { data: membros }] = await Promise.all([
+    const [{ data: socios, error }, { data: membros },
+           { data: receitas }, { data: despesas }] = await Promise.all([
       sb.from('socios').select('*').eq('empresa_id', empresaId)
         .order('participacao_pct', { ascending: false }),
       sb.from('membros').select('id, nome').eq('ativo', true).order('nome'),
+      sb.from('receitas').select('valor, status, data')
+        .eq('empresa_id', empresaId).gte('data', desde).lte('data', ate),
+      sb.from('despesas').select('valor, data')
+        .eq('empresa_id', empresaId).gte('data', desde).lte('data', ate),
     ])
     if (error) return { error: `sócios: ${error.message}` }
 
+    const movimentos = [
+      ...(receitas ?? [])
+        .filter(r => r.status === 'recebido' || r.status === 'confirmado')
+        .map(r => ({ data: r.data as string, valor: n(r.valor) })),
+      ...(despesas ?? []).map(d => ({ data: d.data as string, valor: -n(d.valor) })),
+    ]
+
+    const lista = (socios ?? []).map(x => ({
+      ...x, participacao_pct: n(x.participacao_pct),
+    })) as Socio[]
+
+    // Cada sócio é avaliado pela própria vigência: quem entrou em maio não
+    // leva o resultado de março, e quem saiu em junho não leva o de agosto.
+    const fatias: Record<string, number> = {}
+    for (const socio of lista) {
+      fatias[socio.id] = fatiaNoPeriodo(
+        [{
+          participacao_pct: socio.participacao_pct,
+          entrada: socio.entrada,
+          saida: socio.saida,
+        }],
+        movimentos
+      )
+    }
+
     return {
       data: {
-        socios: (socios ?? []).map(x => ({
-          ...x, participacao_pct: n(x.participacao_pct),
-        })) as Socio[],
+        socios: lista,
         membros: (membros ?? []) as { id: string; nome: string }[],
+        fatias,
       },
     }
   } catch (e) {
