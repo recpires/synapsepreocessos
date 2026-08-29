@@ -7,6 +7,25 @@ export const maxDuration = 60
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+/**
+ * O cliente do cron não é tipado pelo schema, então o select embutido não sabe
+ * que `produtos` é relação para um só. O PostgREST devolve objeto aqui, mas o
+ * tipo inferido admite lista — aceitar as duas formas evita depender disso.
+ */
+type ProjetoResumo = {
+  nome: string
+  fase_atual: string
+  saude: string
+  maturidade_pct: number
+  produtos: { status: string } | { status: string }[] | null
+}
+
+function statusDoProduto(p: ProjetoResumo): string | null {
+  const rel = p.produtos
+  if (!rel) return null
+  return Array.isArray(rel) ? rel[0]?.status ?? null : rel.status
+}
+
 /** Segunda-feira da semana corrente, em ISO. É a competência do resumo. */
 function segundaDaSemana(): string {
   const d = new Date()
@@ -43,7 +62,9 @@ export async function GET(req: NextRequest) {
     { data: propostas }, { data: despesas }, { data: receitas }, { data: contas },
   ] = await Promise.all([
     sb.from('vencimentos').select('*'),
-    sb.from('projetos').select('nome, fase_atual, saude, maturidade_pct').eq('arquivado', false),
+    sb.from('projetos')
+      .select('nome, fase_atual, saude, maturidade_pct, produtos(status)')
+      .eq('arquivado', false),
     sb.from('projeto_erros').select('codigo, titulo, severidade, status, detectado_em')
       .in('status', ['aberto', 'investigando']),
     sb.from('propostas').select('numero, titulo, status, valor_total, validade'),
@@ -63,7 +84,19 @@ export async function GET(req: NextRequest) {
   const saldo = (contas ?? []).reduce((a, c) => a + Number(c.saldo_atual), 0)
 
   const errosCriticos = (erros ?? []).filter(e => e.severidade === 'critica')
-  const emRisco = (projetos ?? []).filter(p => p.saude === 'vermelho')
+
+  // Projeto em pausa fica vermelho porque parou, não porque está atrasado —
+  // é o estado esperado, não um alerta. Contá-lo enchia o resumo de todo mês
+  // com os mesmos três nomes e escondia o que de fato mudou. A pausa vem de
+  // `produtos.status` (SaaS próprio) ou da fase, para projeto de cliente que
+  // não tem produto. `encerrado` sai pelo mesmo motivo.
+  const pausado = (p: ProjetoResumo) =>
+    p.fase_atual === 'pausado' ||
+    p.fase_atual === 'encerrado' ||
+    statusDoProduto(p) === 'pausado'
+
+  const ativos = ((projetos ?? []) as unknown as ProjetoResumo[]).filter(p => !pausado(p))
+  const emRisco = ativos.filter(p => p.saude === 'vermelho')
   const propostasAbertas = (propostas ?? []).filter(
     p => p.status === 'enviada' || p.status === 'em_negociacao'
   )
@@ -139,6 +172,9 @@ export async function GET(req: NextRequest) {
         criticos: criticos.length,
         erros_criticos: errosCriticos.length,
         projetos_em_risco: emRisco.length,
+        // Fica gravado para o zero em `projetos_em_risco` ser lido como
+        // "nenhum ativo em risco", e não como "o cálculo quebrou".
+        projetos_pausados: (projetos ?? []).length - ativos.length,
         propostas_abertas: propostasAbertas.length,
       },
       atualizado_em: new Date().toISOString(),

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui'
 import { toast } from '@/components/Feedback'
 import { moverProjetoDeFase } from '@/server/projetos'
 import {
-  FASES_KANBAN, FASE_LABEL, FASE_WIP, SAUDE_LABEL,
+  FASES_KANBAN, FASE_LABEL, FASE_WIP, SAUDE_LABEL, estaPausado,
   type ProjetoCard, type FaseProjeto, type Saude,
 } from '@/types/projetos'
 
@@ -73,7 +73,9 @@ export function Kanban({ projetos }: { projetos: ProjetoCard[] }) {
               </span>
             </div>
 
-            {daFase.map(p => (
+            {daFase.map(p => {
+              const pausado = estaPausado(p)
+              return (
               <article
                 key={p.id}
                 draggable
@@ -81,14 +83,20 @@ export function Kanban({ projetos }: { projetos: ProjetoCard[] }) {
                 onDragEnd={() => { setArrastando(null); setAlvo(null) }}
                 className={cn(
                   'cursor-grab rounded-token border border-line bg-surface p-2.5 transition-opacity active:cursor-grabbing',
-                  arrastando === p.id && 'opacity-40'
+                  arrastando === p.id && 'opacity-40',
+                  // Pausado continua no quadro, na fase onde parou, mas apagado:
+                  // some do resumo como risco e não deve competir por atenção.
+                  pausado && 'opacity-60'
                 )}
               >
                 <Link href={`/projetos/${p.id}`} className="block">
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={cn('h-2 w-2 flex-shrink-0 rounded-full', COR_SAUDE[p.saude])}
-                      title={SAUDE_LABEL[p.saude]}
+                      className={cn(
+                        'h-2 w-2 flex-shrink-0 rounded-full',
+                        pausado ? 'bg-surface-3' : COR_SAUDE[p.saude]
+                      )}
+                      title={pausado ? 'Pausado' : SAUDE_LABEL[p.saude]}
                     />
                     <h3 className="truncate text-sm font-semibold text-fg">{p.nome}</h3>
                   </div>
@@ -99,6 +107,9 @@ export function Kanban({ projetos }: { projetos: ProjetoCard[] }) {
 
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-subtle">
                     <span className="tabular">{p.maturidade_pct}%</span>
+                    {pausado && (
+                      <Badge tom="neutro" className="px-1.5 py-0 text-[10px]">pausado</Badge>
+                    )}
                     {p.erros_criticos > 0 && (
                       <Badge tom="critico" className="px-1.5 py-0 text-[10px]">
                         {p.erros_criticos} crítico{p.erros_criticos > 1 ? 's' : ''}
@@ -111,7 +122,8 @@ export function Kanban({ projetos }: { projetos: ProjetoCard[] }) {
                   </div>
                 </Link>
               </article>
-            ))}
+              )
+            })}
 
             {daFase.length === 0 && (
               <p className="px-1.5 py-4 text-center text-[11px] text-subtle">Vazio</p>

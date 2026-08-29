@@ -90,6 +90,22 @@ export type ProjetoCard = Projeto & {
   empresa_nome: string | null
   erros_criticos: number
   erros_abertos: number
+  /** Pausa herdada do produto. Projeto de cliente sem produto usa a fase. */
+  produto_pausado: boolean
+}
+
+/**
+ * Projeto parado por decisão, não por atraso.
+ *
+ * A pausa de um SaaS próprio mora em `produtos.status`; a de um projeto de
+ * cliente, que não tem produto, na fase. Quem está em pausa não conta como
+ * risco — vermelho ali é o estado esperado.
+ */
+export function estaPausado(p: {
+  fase_atual: FaseProjeto
+  produto_pausado?: boolean
+}): boolean {
+  return p.fase_atual === 'pausado' || p.fase_atual === 'encerrado' || p.produto_pausado === true
 }
 
 export type ProjetoFase = {

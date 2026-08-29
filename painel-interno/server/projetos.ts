@@ -32,7 +32,7 @@ export async function listarProjetos(): Promise<Resultado<ProjetoCard[]>> {
 
     const [{ data: projetos, error: e1 }, { data: erros, error: e2 }] = await Promise.all([
       sb.from('projetos')
-        .select('*, empresas(razao_social)')
+        .select('*, empresas(razao_social), produtos(status)')
         .eq('arquivado', false)
         .order('maturidade_pct', { ascending: false }),
       sb.from('projeto_erros')
@@ -52,11 +52,15 @@ export async function listarProjetos(): Promise<Resultado<ProjetoCard[]>> {
     }
 
     const cards: ProjetoCard[] = (projetos ?? []).map(p => {
-      const { empresas, ...projeto } = p as Projeto & { empresas: { razao_social: string } | null }
+      const { empresas, produtos, ...projeto } = p as Projeto & {
+        empresas: { razao_social: string } | null
+        produtos: { status: string } | null
+      }
       const c = abertos.get(projeto.id)
       return {
         ...projeto,
         empresa_nome: empresas?.razao_social ?? null,
+        produto_pausado: produtos?.status === 'pausado',
         erros_abertos: c?.total ?? 0,
         erros_criticos: c?.criticos ?? 0,
       }
@@ -79,7 +83,7 @@ export async function obterProjeto(id: string): Promise<Resultado<{
 
     const [{ data: p, error: e1 }, { data: fases }, { data: erros }, { data: maturidade }] =
       await Promise.all([
-        sb.from('projetos').select('*, empresas(razao_social)').eq('id', id).single(),
+        sb.from('projetos').select('*, empresas(razao_social), produtos(status)').eq('id', id).single(),
         sb.from('projeto_fases').select('*').eq('projeto_id', id).order('ordem'),
         sb.from('projeto_erros').select('*').eq('projeto_id', id).order('detectado_em', { ascending: false }),
         sb.from('projeto_maturidade').select('camada, peso, nota, evidencia, avaliado_em')
@@ -88,7 +92,10 @@ export async function obterProjeto(id: string): Promise<Resultado<{
 
     if (e1 || !p) return { error: `projeto ${id}: ${e1?.message ?? 'não encontrado'}` }
 
-    const { empresas, ...projeto } = p as Projeto & { empresas: { razao_social: string } | null }
+    const { empresas, produtos, ...projeto } = p as Projeto & {
+      empresas: { razao_social: string } | null
+      produtos: { status: string } | null
+    }
     const abertos = (erros ?? []).filter(e => e.status === 'aberto' || e.status === 'investigando')
 
     return {
@@ -96,6 +103,7 @@ export async function obterProjeto(id: string): Promise<Resultado<{
         projeto: {
           ...projeto,
           empresa_nome: empresas?.razao_social ?? null,
+          produto_pausado: produtos?.status === 'pausado',
           erros_abertos: abertos.length,
           erros_criticos: abertos.filter(e => e.severidade === 'critica').length,
         },

@@ -4,7 +4,7 @@ import PainelShell from '@/components/PainelShell'
 import { PageHeader, Erro, Badge, Card, CardHeader, CardBody, Metrica } from '@/components/ui'
 import { obterProjeto, listarCamadasMaturidade } from '@/server/projetos'
 import {
-  FASE_LABEL, SAUDE_LABEL, TIPO_PROJETO_LABEL,
+  FASE_LABEL, SAUDE_LABEL, TIPO_PROJETO_LABEL, estaPausado,
   type Saude,
 } from '@/types/projetos'
 import { Fases } from './Fases'
@@ -70,7 +70,9 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
           titulo={projeto.nome}
           descricao={
             <span className="flex flex-wrap items-center gap-2">
-              <Badge tom={TOM_SAUDE[projeto.saude]} ponto>{SAUDE_LABEL[projeto.saude]}</Badge>
+              {estaPausado(projeto)
+                ? <Badge tom="neutro" ponto>Pausado</Badge>
+                : <Badge tom={TOM_SAUDE[projeto.saude]} ponto>{SAUDE_LABEL[projeto.saude]}</Badge>}
               <Badge tom="acento">{FASE_LABEL[projeto.fase_atual]}</Badge>
               <Badge tom="neutro">{TIPO_PROJETO_LABEL[projeto.tipo]}</Badge>
               {projeto.empresa_nome && <span className="text-sm text-muted">{projeto.empresa_nome}</span>}
