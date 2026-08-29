@@ -11,13 +11,31 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 const DIAS  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
 
-const PRODUTOS_PRIORIDADE = [
-  { rank: 1, nome: 'Nero Barber',    sub: 'Mais maduro · sprint ativa',     score: 4.1, pct: 82, color: 'text-amber-400'  },
-  { rank: 2, nome: 'Psi Aura',       sub: 'Precisa atenção técnica',         score: 3.3, pct: 65, color: 'text-slate-400'  },
-  { rank: 3, nome: 'CRM Nexio',      sub: 'MVP em andamento',                score: 2.8, pct: 56, color: 'text-orange-400' },
-  { rank: 4, nome: 'Kubic Eng',      sub: 'Validar com clientes',            score: 2.6, pct: 52, color: 'text-blue-400'   },
-  { rank: 5, nome: 'Arquetipos App', sub: 'Definir escopo primeiro',         score: 2.0, pct: 40, color: 'text-violet-400' },
-]
+/** Cor pela saúde do projeto, que é dado, e não pela posição na lista. */
+const COR_SAUDE: Record<string, string> = {
+  verde: 'text-emerald-400', amarelo: 'text-amber-400', vermelho: 'text-red-400',
+}
+
+const FASE_CURTA: Record<string, string> = {
+  descoberta: 'Descoberta', especificacao: 'Especificação',
+  desenvolvimento: 'Desenvolvimento', qa: 'QA', homologacao: 'Homologação',
+  operacao: 'Em operação', pausado: 'Pausado', encerrado: 'Encerrado',
+}
+
+type ProjetoResumo = {
+  id: string
+  nome: string
+  fase_atual: string
+  saude: string
+  maturidade_pct: number
+}
+
+/** Bom dia / boa tarde / boa noite, pelo relógio de quem abriu. */
+function saudacao(h: number) {
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
 
 const AREA_COR: Record<string, string> = {
   'Comercial':  'bg-blue-900/30 text-blue-400 border border-blue-800/40',
@@ -76,6 +94,13 @@ export default function OverviewPage() {
   const [atencaoLeads, setAtencaoLeads]   = useState<PipelineLead[]>([])
   const [loadingTasks, setLoadingTasks]   = useState(true)
   const [posicoes, setPosicoes]           = useState<PosicaoEmpresa[]>([])
+  const [projetos, setProjetos]           = useState<ProjetoResumo[]>([])
+  const [nomeMembro, setNomeMembro]       = useState('')
+  const [ola, setOla]                     = useState('Olá')
+  const [contagens, setContagens] = useState({
+    produtosAtivos: 0, nomesProdutos: '', pessoas: 0,
+    projetosAndamento: 0, emRisco: 0, vencidos: 0, criticos: 0,
+  })
 
   // Add modal
   const [addOpen, setAddOpen]     = useState(false)
@@ -87,13 +112,22 @@ export default function OverviewPage() {
   useEffect(() => {
     const d = new Date()
     setDataStr(`${DIAS[d.getDay()]}, ${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`)
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ''))
+    setOla(saudacao(d.getHours()))
+    supabase.auth.getUser().then(async ({ data }) => {
+      setUserEmail(data.user?.email ?? '')
+      if (!data.user) return
+      // O nome vem de `membros`, não do código: quem abre o painel nem sempre
+      // é o Rodrigo, e o cabeçalho dava bom dia a ele para qualquer um.
+      const { data: m } = await supabase
+        .from('membros').select('nome').eq('user_id', data.user.id).maybeSingle()
+      if (m?.nome) setNomeMembro(String(m.nome).split(' ')[0])
+    })
     fetchAll()
   }, [])
 
   async function fetchAll() {
     setLoadingTasks(true)
-    await Promise.all([fetchTarefas(), fetchPipeline(), fetchPosicoes()])
+    await Promise.all([fetchTarefas(), fetchPipeline(), fetchPosicoes(), fetchNumeros()])
     setLoadingTasks(false)
   }
 
@@ -104,6 +138,43 @@ export default function OverviewPage() {
    * membro da sessão: cada pessoa vê a própria parte, e ninguém consegue
    * pedir a do outro mandando um id.
    */
+  /**
+   * Números do cabeçalho e do quadro de prioridade.
+   *
+   * Eram literais: "2 pessoas · 5 produtos ativos" e cinco produtos com notas
+   * de 4.1 a 2.0. Todos já estavam errados — são 3 pessoas e 3 produtos
+   * ativos, e as notas nunca vieram de lugar nenhum. Número escrito à mão numa
+   * tela de acompanhamento envelhece sem avisar.
+   */
+  async function fetchNumeros() {
+    const [{ data: produtos }, { count: pessoas }, { data: projs },
+           { data: venc }] = await Promise.all([
+      supabase.from('produtos').select('nome, status').eq('status', 'ativo').order('nome'),
+      supabase.from('membros').select('id', { count: 'exact', head: true }).eq('ativo', true),
+      supabase.from('projetos')
+        .select('id, nome, fase_atual, saude, maturidade_pct')
+        .eq('arquivado', false).order('maturidade_pct', { ascending: false }),
+      supabase.from('vencimentos').select('severidade, silenciado'),
+    ])
+
+    const lista = (projs ?? []) as ProjetoResumo[]
+    const abertos = (venc ?? []).filter(v => !v.silenciado)
+    const andamento = lista.filter(
+      p => p.fase_atual !== 'pausado' && p.fase_atual !== 'encerrado'
+    )
+
+    setProjetos(lista)
+    setContagens({
+      produtosAtivos: (produtos ?? []).length,
+      nomesProdutos: (produtos ?? []).map(p => p.nome).join(' · '),
+      pessoas: pessoas ?? 0,
+      projetosAndamento: andamento.length,
+      emRisco: andamento.filter(p => p.saude === 'vermelho').length,
+      vencidos: abertos.filter(v => v.severidade === 'vencido').length,
+      criticos: abertos.filter(v => v.severidade === 'critico').length,
+    })
+  }
+
   async function fetchPosicoes() {
     const r = await listarPosicoes()
     setPosicoes(r.data ?? [])
@@ -251,17 +322,48 @@ export default function OverviewPage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Bom dia, Rodrigo 👋</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Synapse Code · Software House · 2 pessoas · 5 produtos ativos</p>
+            <h1 className="text-2xl font-bold text-white">
+              {ola}{nomeMembro ? `, ${nomeMembro}` : ''} 👋
+            </h1>
+            <p className="text-gray-500 text-sm mt-0.5">
+              Synapse Code · Software House · {contagens.pessoas} pessoa{contagens.pessoas === 1 ? '' : 's'}
+              {' · '}
+              {contagens.produtosAtivos} produto{contagens.produtosAtivos === 1 ? '' : 's'} ativo{contagens.produtosAtivos === 1 ? '' : 's'}
+            </p>
           </div>
           <span className="text-sm text-gray-600">{dataStr}</span>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard dot="#34d399" label="Produtos ativos"        value="5"           sub="Nero Barber · Psi Aura · CRM Nexio · Kubic Eng · Arquetipos" />
-          <StatCard dot="#fbbf24" label="Foco atual"             value="Nero Barber" sub="Sprint 1 · Estabilização + Marketing" />
-          <StatCard dot="#60a5fa" label="Processos documentados" value="5"           sub="Dev · Comercial · Marketing · Financeiro · Time" />
+          <StatCard
+            dot="#34d399"
+            label="Produtos ativos"
+            value={String(contagens.produtosAtivos)}
+            sub={contagens.nomesProdutos || 'Nenhum produto ativo'}
+          />
+          <StatCard
+            dot="#fbbf24"
+            label="Projetos em andamento"
+            value={String(contagens.projetosAndamento)}
+            sub={
+              contagens.emRisco > 0
+                ? `${contagens.emRisco} em risco`
+                : 'Nenhum em risco'
+            }
+          />
+          <StatCard
+            dot={contagens.vencidos > 0 ? '#f87171' : '#60a5fa'}
+            label="Vencimentos"
+            value={String(contagens.vencidos + contagens.criticos)}
+            sub={
+              contagens.vencidos > 0
+                ? `${contagens.vencidos} vencido(s), ${contagens.criticos} nesta semana`
+                : contagens.criticos > 0
+                  ? `${contagens.criticos} nos próximos 7 dias`
+                  : 'Nada vencendo agora'
+            }
+          />
           <StatCard
             dot={parte.valor < 0 ? '#f87171' : '#a78bfa'}
             label="Sua parte até hoje"
@@ -303,26 +405,37 @@ export default function OverviewPage() {
           <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5">
             <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-4 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-violet-500 inline-block" />
-              Prioridade dos produtos
+              Projetos por maturidade
             </p>
             <div className="space-y-4">
-              {PRODUTOS_PRIORIDADE.map(p => (
-                <div key={p.rank} className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 ${p.color} bg-white/5`}>
-                    {p.rank}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white">{p.nome}</div>
-                    <div className="text-xs text-gray-500">{p.sub}</div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="w-20 h-1.5 bg-[#1e1e2e] rounded-full overflow-hidden">
-                      <div className="h-full bg-violet-600 rounded-full" style={{ width: `${p.pct}%` }} />
+              {projetos.length === 0 && (
+                <p className="text-xs text-gray-500">Nenhum projeto cadastrado.</p>
+              )}
+              {projetos.slice(0, 6).map((p, i) => {
+                const cor = COR_SAUDE[p.saude] ?? 'text-gray-400'
+                const parado = p.fase_atual === 'pausado' || p.fase_atual === 'encerrado'
+                return (
+                  <div key={p.id} className={`flex items-center gap-3 ${parado ? 'opacity-60' : ''}`}>
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 ${cor} bg-white/5`}>
+                      {i + 1}
                     </div>
-                    <span className={`text-xs font-semibold w-7 text-right ${p.color}`}>{p.score}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white truncate">{p.nome}</div>
+                      <div className="text-xs text-gray-500">
+                        {FASE_CURTA[p.fase_atual] ?? p.fase_atual}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="w-20 h-1.5 bg-[#1e1e2e] rounded-full overflow-hidden">
+                        <div className="h-full bg-violet-600 rounded-full" style={{ width: `${p.maturidade_pct}%` }} />
+                      </div>
+                      <span className={`text-xs font-semibold w-9 text-right tabular ${cor}`}>
+                        {p.maturidade_pct}%
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
