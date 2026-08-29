@@ -10,3 +10,9 @@ Thumbs.db
 
 # Backups locais do painel (contêm dados financeiros)
 painel-interno/backups/
+
+# Arquivos vazios criados por acidente de redirecionamento no shell.
+# Nomes com parêntese, crase, ponto ou dígito solto não são código deste projeto.
+painel-interno/[0-9]
+painel-interno/*.status
+painel-interno/b.margem
