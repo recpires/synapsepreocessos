@@ -3,6 +3,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { assertMembro, assertAdmin } from '@/lib/auth/membro'
 
 // ─── Painel interno: cliente autenticado via cookies ─────────────────────────
 
@@ -82,6 +83,7 @@ export type KubicAdminData = {
 
 export async function fetchNeroBarberAdmin(): Promise<{ data?: NeroAdminData; error?: string }> {
   try {
+    await assertMembro()
     const sb = nbAdmin()
     const [
       { data: shops, error: e1 },
@@ -135,6 +137,8 @@ export async function updateNeroShopPlan(
   newPlanId: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    // Escreve com service role no banco de produção do Nero Barber.
+    await assertAdmin()
     const { error } = await nbAdmin()
       .from('barbershops')
       .update({ current_plan_id: newPlanId })
@@ -148,6 +152,7 @@ export async function updateNeroShopPlan(
 
 export async function fetchKubicEngAdmin(): Promise<{ data?: KubicAdminData; error?: string }> {
   try {
+    await assertMembro()
     const sb = keAdmin()
     const [
       { data: users, error: e1 },
@@ -201,6 +206,8 @@ export async function updateKubicUserPlan(
   newPlanId: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    // Escreve com service role no banco de produção do Kubic Eng.
+    await assertAdmin()
     const { error } = await keAdmin()
       .from('Subscription')
       .update({ planId: newPlanId, updatedAt: new Date().toISOString() })
@@ -242,6 +249,7 @@ export type NexioAdminData = {
 
 export async function fetchNexioAdmin(): Promise<{ data?: NexioAdminData; error?: string }> {
   try {
+    await assertMembro()
     const url = process.env.NEXIO_API_URL
     const key = process.env.NEXIO_ADMIN_KEY
     if (!url || !key) throw new Error('Configure NEXIO_API_URL e NEXIO_ADMIN_KEY no .env.local')
@@ -279,6 +287,7 @@ export async function fetchNexioAdmin(): Promise<{ data?: NexioAdminData; error?
 
 export async function fetchPsiAuraAdmin(): Promise<{ data?: PsiAuraAdminData; error?: string }> {
   try {
+    await assertMembro()
     const url = process.env.PSI_AURA_API_URL
     const key = process.env.PSI_AURA_ADMIN_KEY
     if (!url || !key) throw new Error('Configure PSI_AURA_API_URL e PSI_AURA_ADMIN_KEY no .env.local')

@@ -12,7 +12,7 @@ import {
   RESPONSAVEIS,
   STATUS_CORES,
   STATUS_LABEL,
-} from '@/types/contratos'
+} from '@/types/empresas'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ export default function SubNav({ tabs }: { tabs: readonly SubNavTab[] }) {
   const pathname = usePathname()
 
   return (
-    <div className="flex items-center gap-1 bg-[#111118] border border-[#1e1e2e] rounded-xl p-1 w-fit max-w-full overflow-x-auto print:hidden">
+    <div className="flex items-center gap-1 bg-surface border border-line rounded-xl p-1 w-fit max-w-full overflow-x-auto print:hidden">
       {tabs.map(t => {
         const isActive = pathname === t.href || pathname.startsWith(t.href + '/')
         return (
@@ -17,8 +17,8 @@ export default function SubNav({ tabs }: { tabs: readonly SubNavTab[] }) {
             href={t.href}
             className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
               isActive
-                ? 'bg-violet-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-[#1e1e2e]'
+                ? 'bg-accent text-accent-fg'
+                : 'text-muted hover:text-fg hover:bg-surface-2'
             }`}
           >
             {t.icon && <span className="text-sm leading-none">{t.icon}</span>}

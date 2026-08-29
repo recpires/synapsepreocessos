@@ -133,13 +133,13 @@ export default function FeedbackHost() {
       {conf && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4"
           onClick={() => resolverConfirm(false)}>
-          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-sm p-5"
+          <div className="bg-surface border border-line rounded-xl w-full max-w-sm p-5"
             onClick={e => e.stopPropagation()}>
             <h3 className="font-semibold text-white text-lg">{conf.titulo}</h3>
             {conf.mensagem && <p className="text-sm text-gray-400 mt-2 whitespace-pre-line">{conf.mensagem}</p>}
             <div className="flex gap-3 mt-5">
               <button onClick={() => resolverConfirm(false)}
-                className="flex-1 bg-[#1e1e2e] hover:bg-[#2d2d3d] text-gray-300 font-medium py-2.5 rounded-lg transition-colors text-sm">
+                className="flex-1 bg-surface-2 hover:bg-surface-3 text-gray-300 font-medium py-2.5 rounded-lg transition-colors text-sm">
                 {conf.cancelLabel ?? 'Cancelar'}
               </button>
               <button onClick={() => resolverConfirm(true)}
@@ -157,7 +157,7 @@ export default function FeedbackHost() {
       {esc && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4"
           onClick={() => resolverEscolher(null)}>
-          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-sm p-5"
+          <div className="bg-surface border border-line rounded-xl w-full max-w-sm p-5"
             onClick={e => e.stopPropagation()}>
             <h3 className="font-semibold text-white text-lg">{esc.titulo}</h3>
             {esc.mensagem && <p className="text-sm text-gray-400 mt-2 whitespace-pre-line">{esc.mensagem}</p>}
@@ -167,7 +167,7 @@ export default function FeedbackHost() {
                   className={`w-full text-left px-4 py-2.5 rounded-lg transition-colors text-sm border ${
                     op.perigoso
                       ? 'border-red-800/60 bg-red-900/20 hover:bg-red-900/40 text-red-200'
-                      : 'border-[#2d2d3d] bg-[#0a0a0f] hover:bg-[#1e1e2e] text-gray-200'
+                      : 'border-line-strong bg-ground hover:bg-surface-2 text-gray-200'
                   }`}>
                   <span className="font-medium">{op.label}</span>
                   {op.descricao && <span className="block text-xs text-gray-500 mt-0.5">{op.descricao}</span>}

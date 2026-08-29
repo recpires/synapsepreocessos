@@ -14,14 +14,21 @@ export const SUBNAV = {
     { href: '/financeiro', label: 'Despesas',  icon: '💰' },
     { href: '/receitas',   label: 'Receitas',  icon: '💵' },
     { href: '/balanco',    label: 'Balanço',   icon: '📑' },
+    { href: '/financeiro/custos',    label: 'Custos',    icon: '🧮' },
+    { href: '/financeiro/orcamento', label: 'Orçamento', icon: '🎯' },
+    { href: '/financeiro/caixa',     label: 'Caixa',     icon: '🏦' },
+    { href: '/financeiro/relatorio', label: 'Relatório', icon: '📄' },
   ],
   empresa: [
     { href: '/empresa',    label: 'Documentos', icon: '🏢' },
     { href: '/documentos', label: 'Arquivos',   icon: '🗂️' },
-    { href: '/contratos',  label: 'Contratos',  icon: '📝' },
+    { href: '/contratos',           label: 'Contratos', icon: '📝' },
+    { href: '/contratos/templates', label: 'Templates', icon: '🧾' },
   ],
   comercial: [
-    { href: '/comercial', label: 'Comercial', icon: '💼' },
+    { href: '/comercial',               label: 'Pipeline',      icon: '💼' },
+    { href: '/comercial/propostas',     label: 'Propostas',     icon: '📨' },
+    { href: '/comercial/precificacao',  label: 'Precificação',  icon: '🏷️' },
   ],
   dev: [
     { href: '/dev',    label: 'Desenvolvimento', icon: '⚙️' },
