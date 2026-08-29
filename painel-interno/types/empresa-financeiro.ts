@@ -150,6 +150,19 @@ export type UsoDoTeto = {
   uso_pct: number | null
 }
 
+export type Socio = {
+  id: string
+  empresa_id: string
+  nome: string
+  /** Preenchido quando o sócio também é usuário do painel. */
+  membro_id: string | null
+  participacao_pct: number
+  papel: string | null
+  entrada: string | null
+  saida: string | null
+  observacao: string | null
+}
+
 /** O que a tela de uma empresa mostra: faturado, recebido, gasto, devido. */
 export type PosicaoEmpresa = {
   empresa: EmpresaPropria
@@ -161,6 +174,16 @@ export type PosicaoEmpresa = {
   saldoDevedor: number
   parcelasAtrasadas: number
   notas: number
+  /**
+   * Fatia de quem está olhando. `null` quando a pessoa não é sócia declarada
+   * — que é diferente de 0%: uma coisa é não ter parte, outra é o cadastro
+   * ainda não dizer.
+   */
+  minhaParticipacaoPct: number | null
+  /** Resultado do ano vezes a fatia. `null` pelo mesmo motivo acima. */
+  minhaParte: number | null
+  /** Quanto do capital já foi declarado. Menos de 100 = cadastro incompleto. */
+  declaradoPct: number
 }
 
 /**

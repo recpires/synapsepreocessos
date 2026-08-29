@@ -50,6 +50,7 @@ export default async function EmpresasFinanceiroPage() {
                     <Th numerica>Recebido</Th>
                     <Th numerica>Despesa</Th>
                     <Th numerica>Resultado</Th>
+                    <Th numerica>Sua parte</Th>
                     <Th numerica>Dívida</Th>
                     <Th>Teto</Th>
                   </tr>
@@ -82,6 +83,33 @@ export default async function EmpresasFinanceiroPage() {
                           <span className={p.resultadoAno < 0 ? 'text-crit' : 'text-ok'}>
                             {brl(p.resultadoAno)}
                           </span>
+                        </Td>
+                        <Td numerica>
+                          {p.minhaParticipacaoPct === null ? (
+                            <span
+                              className="text-xs text-subtle"
+                              title="Você não está declarado como sócio desta empresa — o que é diferente de ter 0%."
+                            >
+                              —
+                            </span>
+                          ) : (
+                            <>
+                              <span className={p.minhaParte! < 0 ? 'text-crit' : 'text-fg'}>
+                                {brl(p.minhaParte!)}
+                              </span>
+                              <div className="text-[11px] text-subtle">
+                                {p.minhaParticipacaoPct}%
+                                {p.declaradoPct < 99.999 && (
+                                  <span
+                                    className="text-warn"
+                                    title={`Só ${p.declaradoPct}% do capital está declarado.`}
+                                  >
+                                    {' '}· cadastro incompleto
+                                  </span>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </Td>
                         <Td numerica>
                           {p.saldoDevedor > 0 ? brl(p.saldoDevedor) : '—'}
@@ -140,7 +168,10 @@ export default async function EmpresasFinanceiroPage() {
                 competência; <strong className="text-muted">recebido</strong> é dinheiro que
                 entrou. A distância entre os dois é o que você vendeu e ainda não recebeu — somar
                 os dois numa linha só apagaria justamente isso. O resultado usa recebido menos
-                despesa, não a nota: caixa, não competência.
+                despesa, não a nota: caixa, não competência.{' '}
+                <strong className="text-muted">Sua parte</strong> é o resultado vezes a sua
+                participação societária, e aparece só nas empresas em que você está declarado
+                como sócio — cada pessoa que abre esta tela vê a própria fatia, não a dos outros.
                 {totalFaturado === 0 && totalDevedor === 0 && (
                   <> Ainda não há nota nem dívida lançada, então a tabela mostra zeros reais.</>
                 )}

@@ -6,11 +6,14 @@ import { SUBNAV } from '@/lib/nav'
 import {
   PageHeader, Erro, Card, CardHeader, CardBody, Metrica, Badge,
 } from '@/components/ui'
-import { listarPosicoes, listarNotas, listarDividas } from '@/server/empresa-financeiro'
+import {
+  listarPosicoes, listarNotas, listarDividas, listarSocios,
+} from '@/server/empresa-financeiro'
 import { listarEmpresasCompletas } from '@/server/empresas'
 import { REGIME_LABEL, TIPO_DIVIDA_LABEL } from '@/types/empresa-financeiro'
 import { Fiscal } from './Fiscal'
 import { Notas } from './Notas'
+import { Socios } from './Socios'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,11 +24,12 @@ export default async function EmpresaFinanceiroPage({
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const [posicoes, notas, dividas, todasEmpresas] = await Promise.all([
+  const [posicoes, notas, dividas, todasEmpresas, socios] = await Promise.all([
     listarPosicoes(),
     listarNotas(id),
     listarDividas(id),
     listarEmpresasCompletas(),
+    listarSocios(id),
   ])
 
   if (posicoes.error) {
@@ -83,7 +87,11 @@ export default async function EmpresaFinanceiroPage({
           <Metrica
             rotulo="Resultado"
             valor={brl(p.resultadoAno)}
-            detalhe={`${brl(p.despesaAno)} de despesa`}
+            detalhe={
+              p.minhaParticipacaoPct !== null
+                ? `${brl(p.minhaParte ?? 0)} é sua (${p.minhaParticipacaoPct}%)`
+                : `${brl(p.despesaAno)} de despesa`
+            }
           />
           <Metrica
             rotulo="Dívida em aberto"
@@ -117,6 +125,21 @@ export default async function EmpresaFinanceiroPage({
             descricao="Regime e teto alimentam o alerta dos 12 meses corridos."
           />
           <CardBody><Fiscal empresa={p.empresa} /></CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            titulo="Sócios"
+            descricao="Quem é dono de quanto. Sem isto o painel trata a empresa como inteira sua."
+          />
+          <CardBody>
+            <Socios
+              empresaId={id}
+              socios={socios.data?.socios ?? []}
+              membros={socios.data?.membros ?? []}
+              resultadoAno={p.resultadoAno}
+            />
+          </CardBody>
         </Card>
 
         <Card>

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { assertMembro } from '@/lib/auth/membro'
 import { gerarParcelas } from '@/types/empresa-financeiro'
 import type {
-  EmpresaPropria, PosicaoEmpresa, UsoDoTeto,
+  EmpresaPropria, PosicaoEmpresa, UsoDoTeto, Socio,
   NotaFiscal, Divida, DividaResumo, Parcela,
   RegimeTributario, TipoDivida,
 } from '@/types/empresa-financeiro'
@@ -65,13 +65,16 @@ export async function listarEmpresasProprias(): Promise<Resultado<EmpresaPropria
  */
 export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
   try {
-    await assertMembro()
+    // O membro da sessão é quem define de quem é a "sua parte" — a tela não
+    // precisa mandar id, e ninguém consegue pedir a fatia de outro.
+    const eu = await assertMembro()
     const sb = await createClient()
     const desde = inicioDoAno()
 
     const [
       { data: empresas, error: e1 }, { data: tetos },
       { data: notas }, { data: receitas }, { data: despesas }, { data: dividas },
+      { data: socios }, { data: declarado },
     ] = await Promise.all([
       sb.from('empresas')
         .select('id, razao_social, nome_fantasia, cnpj, regime_tributario, teto_faturamento, abertura, ativa')
@@ -82,6 +85,8 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
       sb.from('receitas').select('empresa_id, valor, status').gte('data', desde),
       sb.from('despesas').select('empresa_id, valor').gte('data', desde),
       sb.from('dividas_resumo').select('empresa_id, saldo_devedor, parcelas_atrasadas, status'),
+      sb.from('socios').select('empresa_id, membro_id, participacao_pct').is('saida', null),
+      sb.from('participacao_declarada').select('empresa_id, declarado_pct'),
     ])
     if (e1) return { error: `empresas: ${e1.message}` }
 
@@ -105,6 +110,14 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
     const porAtraso = somar(ativas, r => r.empresa_id, r => n(r.parcelas_atrasadas))
     const contagemNF = somar(notas, r => r.empresa_id, () => 1)
     const tetoPorEmpresa = new Map((tetos ?? []).map(t => [t.empresa_id as string, t]))
+    const minhaFatia = new Map(
+      (socios ?? [])
+        .filter(x => x.membro_id === eu.id)
+        .map(x => [x.empresa_id as string, n(x.participacao_pct)])
+    )
+    const declaradoPorEmpresa = new Map(
+      (declarado ?? []).map(d => [d.empresa_id as string, n(d.declarado_pct)])
+    )
 
     const data: PosicaoEmpresa[] = (empresas ?? []).map(e => {
       const recebido = centavos(porReceita.get(e.id) ?? 0)
@@ -130,6 +143,11 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
         saldoDevedor: centavos(porDivida.get(e.id) ?? 0),
         parcelasAtrasadas: porAtraso.get(e.id) ?? 0,
         notas: contagemNF.get(e.id) ?? 0,
+        minhaParticipacaoPct: minhaFatia.get(e.id) ?? null,
+        minhaParte: minhaFatia.has(e.id)
+          ? centavos((recebido - gasto) * (minhaFatia.get(e.id)! / 100))
+          : null,
+        declaradoPct: declaradoPorEmpresa.get(e.id) ?? 0,
       }
     })
 
@@ -165,6 +183,107 @@ export async function salvarDadosFiscais(dados: {
 
     revalidatePath('/financeiro/empresas')
     revalidatePath(`/financeiro/empresas/${dados.id}`)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+// ── Sócios ──────────────────────────────────────────────────────────────────
+
+export async function listarSocios(empresaId: string): Promise<Resultado<{
+  socios: Socio[]
+  membros: { id: string; nome: string }[]
+}>> {
+  try {
+    await assertMembro()
+    const sb = await createClient()
+
+    const [{ data: socios, error }, { data: membros }] = await Promise.all([
+      sb.from('socios').select('*').eq('empresa_id', empresaId)
+        .order('participacao_pct', { ascending: false }),
+      sb.from('membros').select('id, nome').eq('ativo', true).order('nome'),
+    ])
+    if (error) return { error: `sócios: ${error.message}` }
+
+    return {
+      data: {
+        socios: (socios ?? []).map(x => ({
+          ...x, participacao_pct: n(x.participacao_pct),
+        })) as Socio[],
+        membros: (membros ?? []) as { id: string; nome: string }[],
+      },
+    }
+  } catch (e) {
+    return falha('listarSocios', e)
+  }
+}
+
+export async function salvarSocio(dados: {
+  id?: string
+  empresa_id: string
+  nome: string
+  membro_id?: string | null
+  participacao_pct: number
+  papel?: string | null
+  entrada?: string | null
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await assertMembro()
+    const sb = await createClient()
+
+    if (!dados.nome.trim()) return { ok: false, error: 'Informe o nome do sócio.' }
+    if (!(dados.participacao_pct > 0 && dados.participacao_pct <= 100)) {
+      return { ok: false, error: 'Participação precisa ficar entre 0 e 100%.' }
+    }
+
+    const linha = {
+      empresa_id: dados.empresa_id,
+      nome: dados.nome.trim(),
+      membro_id: dados.membro_id || null,
+      participacao_pct: dados.participacao_pct,
+      papel: dados.papel?.trim() || null,
+      entrada: dados.entrada || null,
+    }
+
+    const { error } = dados.id
+      ? await sb.from('socios').update(linha).eq('id', dados.id)
+      : await sb.from('socios').insert(linha)
+
+    if (error) {
+      // O gatilho do banco é quem garante os 100%; aqui só traduzimos.
+      if (/100/.test(error.message)) {
+        return { ok: false, error: error.message }
+      }
+      if (error.code === '23505') {
+        return { ok: false, error: 'Este membro já está cadastrado como sócio desta empresa.' }
+      }
+      return { ok: false, error: error.message }
+    }
+
+    revalidatePath('/financeiro/empresas')
+    revalidatePath(`/financeiro/empresas/${dados.empresa_id}`)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/**
+ * Registra a saída do sócio em vez de apagar a linha.
+ *
+ * Quem era sócio quando o resultado foi apurado importa depois. A conta para
+ * de somar porque a view e o gatilho ignoram quem tem `saida`.
+ */
+export async function encerrarSocio(
+  id: string, saida: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await assertMembro()
+    const sb = await createClient()
+    const { error } = await sb.from('socios').update({ saida }).eq('id', id)
+    if (error) return { ok: false, error: error.message }
+    revalidatePath('/financeiro/empresas')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
