@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import { listarPosicoes } from '@/server/empresa-financeiro'
+import type { PosicaoEmpresa } from '@/types/empresa-financeiro'
+
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const DIAS  = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
@@ -71,6 +75,7 @@ export default function OverviewPage() {
   const [doneRefIds, setDoneRefIds]       = useState<Set<string>>(new Set())
   const [atencaoLeads, setAtencaoLeads]   = useState<PipelineLead[]>([])
   const [loadingTasks, setLoadingTasks]   = useState(true)
+  const [posicoes, setPosicoes]           = useState<PosicaoEmpresa[]>([])
 
   // Add modal
   const [addOpen, setAddOpen]     = useState(false)
@@ -88,8 +93,20 @@ export default function OverviewPage() {
 
   async function fetchAll() {
     setLoadingTasks(true)
-    await Promise.all([fetchTarefas(), fetchPipeline()])
+    await Promise.all([fetchTarefas(), fetchPipeline(), fetchPosicoes()])
     setLoadingTasks(false)
+  }
+
+  /**
+   * Posição financeira das empresas próprias, para a fatia consolidada.
+   *
+   * Vem por Server Action e não por query direta porque a participação sai do
+   * membro da sessão: cada pessoa vê a própria parte, e ninguém consegue
+   * pedir a do outro mandando um id.
+   */
+  async function fetchPosicoes() {
+    const r = await listarPosicoes()
+    setPosicoes(r.data ?? [])
   }
 
   async function fetchTarefas() {
@@ -194,6 +211,33 @@ export default function OverviewPage() {
                         ...manualPending.map(t => ({ tipo: 'manual' as const, tarefa: t }))]
     .slice(0, 8)
 
+  // Sua fatia somada das empresas em que você é sócio declarado. Zero com
+  // lançamento por atribuir engana: o rodapé diz por que o número é o que é.
+  const parte = (() => {
+    const minhas = posicoes.filter(p => p.minhaParticipacaoPct !== null)
+    if (minhas.length === 0) {
+      return {
+        valor: 0,
+        temSociedade: false,
+        explicacao: posicoes.length
+          ? 'Você não está declarado como sócio de nenhuma empresa'
+          : 'Nenhuma empresa própria cadastrada',
+      }
+    }
+    const valor = minhas.reduce((a, p) => a + (p.minhaParte ?? 0), 0)
+    const detalhe = minhas
+      .map(p => `${p.empresa.nome_fantasia || p.empresa.razao_social} ${p.minhaParticipacaoPct}%`)
+      .join(' · ')
+    const semMovimento = minhas.every(p => p.recebidoAno === 0 && p.despesaAno === 0)
+    return {
+      valor,
+      temSociedade: true,
+      explicacao: semMovimento
+        ? `${detalhe} — sem lançamento atribuído ainda`
+        : detalhe,
+    }
+  })()
+
   return (
     <PainelShell>
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
@@ -208,10 +252,16 @@ export default function OverviewPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard dot="#34d399" label="Produtos ativos"        value="5"           sub="Nero Barber · Psi Aura · CRM Nexio · Kubic Eng · Arquetipos" />
           <StatCard dot="#fbbf24" label="Foco atual"             value="Nero Barber" sub="Sprint 1 · Estabilização + Marketing" />
           <StatCard dot="#60a5fa" label="Processos documentados" value="5"           sub="Dev · Comercial · Marketing · Financeiro · Time" />
+          <StatCard
+            dot={parte.valor < 0 ? '#f87171' : '#a78bfa'}
+            label="Sua parte no ano"
+            value={parte.temSociedade ? brl(parte.valor) : '—'}
+            sub={parte.explicacao}
+          />
         </div>
 
         {/* Atenção: leads que precisam de ação imediata */}
