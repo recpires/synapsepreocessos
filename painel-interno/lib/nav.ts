@@ -14,6 +14,7 @@ export const SUBNAV = {
     { href: '/financeiro', label: 'Despesas',  icon: '💰' },
     { href: '/receitas',   label: 'Receitas',  icon: '💵' },
     { href: '/balanco',    label: 'Balanço',   icon: '📑' },
+    { href: '/financeiro/dre',       label: 'DRE',       icon: '📊' },
     { href: '/financeiro/custos',    label: 'Custos',    icon: '🧮' },
     { href: '/financeiro/orcamento', label: 'Orçamento', icon: '🎯' },
     { href: '/financeiro/caixa',     label: 'Caixa',     icon: '🏦' },
