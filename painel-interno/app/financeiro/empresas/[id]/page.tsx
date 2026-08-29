@@ -75,14 +75,14 @@ export default async function EmpresaFinanceiroPage({
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metrica
-            rotulo="Faturado no ano"
+            rotulo="Faturado até hoje"
             valor={brl(p.faturadoAno)}
             detalhe={`${p.notas} nota(s) emitida(s)`}
           />
           <Metrica
-            rotulo="Recebido no ano"
+            rotulo="Recebido até hoje"
             valor={brl(p.recebidoAno)}
-            detalhe="Receita confirmada ou recebida"
+            detalhe="Confirmada ou recebida, no ano até hoje"
           />
           <Metrica
             rotulo="Resultado"

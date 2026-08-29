@@ -33,6 +33,19 @@ function inicioDoAno(): string {
   return `${new Date().getUTCFullYear()}-01-01`
 }
 
+/**
+ * Fim da janela: hoje, não 31 de dezembro.
+ *
+ * `despesas` e `receitas` guardam também o que o cron já gerou para as
+ * recorrências — no dia em que os 228 lançamentos foram atribuídos, R$ 59.702,92
+ * dos R$ 92.687,51 eram parcelas futuras, algumas de 2027. Somar o ano inteiro
+ * transforma a posição da empresa numa projeção disfarçada de fato, que foi o
+ * mesmo erro já corrigido no DRE.
+ */
+function hojeISO(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 // ── Empresas ────────────────────────────────────────────────────────────────
 
 export async function listarEmpresasProprias(): Promise<Resultado<EmpresaPropria[]>> {
@@ -70,6 +83,7 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
     const eu = await assertMembro()
     const sb = await createClient()
     const desde = inicioDoAno()
+    const ate = hojeISO()
 
     const [
       { data: empresas, error: e1 }, { data: tetos },
@@ -81,9 +95,11 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
         .eq('tipo', 'propria').order('razao_social'),
       sb.from('teto_faturamento').select('*'),
       sb.from('notas_fiscais').select('empresa_id, valor_servicos, status')
-        .gte('competencia', desde).eq('status', 'emitida'),
-      sb.from('receitas').select('empresa_id, valor, status').gte('data', desde),
-      sb.from('despesas').select('empresa_id, valor').gte('data', desde),
+        .gte('competencia', desde).lte('competencia', ate).eq('status', 'emitida'),
+      sb.from('receitas').select('empresa_id, valor, status')
+        .gte('data', desde).lte('data', ate),
+      sb.from('despesas').select('empresa_id, valor')
+        .gte('data', desde).lte('data', ate),
       sb.from('dividas_resumo').select('empresa_id, saldo_devedor, parcelas_atrasadas, status'),
       sb.from('socios').select('empresa_id, membro_id, participacao_pct').is('saida', null),
       sb.from('participacao_declarada').select('empresa_id, declarado_pct'),

@@ -258,7 +258,7 @@ export default function OverviewPage() {
           <StatCard dot="#60a5fa" label="Processos documentados" value="5"           sub="Dev · Comercial · Marketing · Financeiro · Time" />
           <StatCard
             dot={parte.valor < 0 ? '#f87171' : '#a78bfa'}
-            label="Sua parte no ano"
+            label="Sua parte até hoje"
             value={parte.temSociedade ? brl(parte.valor) : '—'}
             sub={parte.explicacao}
           />

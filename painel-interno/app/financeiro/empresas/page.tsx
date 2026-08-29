@@ -27,7 +27,7 @@ export default async function EmpresasFinanceiroPage() {
       <div className="space-y-6 p-6">
         <PageHeader
           titulo="Empresas"
-          descricao="Cada CNPJ com seu faturamento, seu resultado e o que ainda deve. Números do ano corrente."
+          descricao="Cada CNPJ com seu faturamento, seu resultado e o que ainda deve. Do dia 1º de janeiro até hoje."
         />
         <SubNav tabs={SUBNAV.financeiro} />
 
@@ -168,7 +168,10 @@ export default async function EmpresasFinanceiroPage() {
                 competência; <strong className="text-muted">recebido</strong> é dinheiro que
                 entrou. A distância entre os dois é o que você vendeu e ainda não recebeu — somar
                 os dois numa linha só apagaria justamente isso. O resultado usa recebido menos
-                despesa, não a nota: caixa, não competência.{' '}
+                despesa, não a nota: caixa, não competência. A janela termina{' '}
+                <strong className="text-muted">hoje</strong>, não em 31 de dezembro: a tabela de
+                despesas guarda também as parcelas que o cron já gerou para as recorrências, e
+                incluí-las transformaria a posição numa projeção disfarçada de fato.{' '}
                 <strong className="text-muted">Sua parte</strong> é o resultado vezes a sua
                 participação societária, e aparece só nas empresas em que você está declarado
                 como sócio — cada pessoa que abre esta tela vê a própria fatia, não a dos outros.
