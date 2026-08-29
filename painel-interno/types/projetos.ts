@@ -14,6 +14,15 @@ export const FASES_KANBAN: FaseProjeto[] = [
   'descoberta', 'especificacao', 'desenvolvimento', 'qa', 'homologacao', 'operacao',
 ]
 
+/**
+ * Fases que não são etapa de trabalho e por isso não viram coluna.
+ *
+ * Ficam numa faixa abaixo do quadro, e não fora dele: card arrastado para uma
+ * fase sem lugar na tela desaparecia sem volta — o projeto seguia no banco e
+ * sumia da única tela onde se mexe nele.
+ */
+export const FASES_FORA_DO_QUADRO: FaseProjeto[] = ['pausado', 'encerrado']
+
 export const FASE_LABEL: Record<FaseProjeto, string> = {
   descoberta:      'Descoberta',
   especificacao:   'Especificação',
