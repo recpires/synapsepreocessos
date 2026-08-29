@@ -26,6 +26,7 @@ const NAV = [
   { href: '/processos',  icon: '📋', label: 'Processos' },
   { href: '/conhecimento', icon: '📚', label: 'Conhecimento' },
   { href: '/vencimentos', icon: '⏰', label: 'Vencimentos' },
+  { href: '/resumos', icon: '🗞️', label: 'Resumo semanal' },
   { href: '/config/atividades', icon: '🕘', label: 'Atividades' },
 ]
 

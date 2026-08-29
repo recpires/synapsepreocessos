@@ -6,9 +6,13 @@ import {
   fetchNeroBarberAdmin, updateNeroShopPlan,
   fetchKubicEngAdmin, updateKubicUserPlan,
   fetchPsiAuraAdmin, fetchNexioAdmin,
-  type NeroAdminData, type KubicAdminData, type NeroPlan, type KubicPlan,
-  type PsiAuraAdminData, type NexioAdminData,
 } from '@/lib/supabase/server'
+// Os tipos vêm do módulo de coleta: um arquivo `'use server'` só pode
+// exportar funções async.
+import type {
+  NeroAdminData, KubicAdminData, NeroPlan, KubicPlan,
+  PsiAuraAdminData, NexioAdminData,
+} from '@/lib/produtos-admin'
 
 /* ─── Tipos ───────────────────────────────────────────────────── */
 interface Cor    { nome: string; hex: string; uso: string }

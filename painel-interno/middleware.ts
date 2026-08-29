@@ -2,10 +2,12 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // Webhooks externos (Asaas) chegam sem cookie de sessão e se autenticam pelo
-  // próprio token no header. Sem esta saída antecipada o middleware devolve
-  // redirect 307 para /login e o handler nunca roda.
-  if (request.nextUrl.pathname.startsWith('/api/webhooks/')) {
+  // Webhooks externos (Asaas) e os crons da Vercel chegam sem cookie de sessão
+  // e se autenticam pelo próprio header. Sem esta saída antecipada o middleware
+  // devolve redirect 307 para /login e o handler nunca roda — foi exatamente
+  // isso que manteve a tabela `receitas` vazia por meses.
+  const p = request.nextUrl.pathname
+  if (p.startsWith('/api/webhooks/') || p.startsWith('/api/cron/')) {
     return NextResponse.next()
   }
 
