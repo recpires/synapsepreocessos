@@ -13,6 +13,7 @@ type Resumo = {
   dados: Record<string, number>
   enviado_em: string | null
   canal: string | null
+  atualizado_em: string
 }
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -82,7 +83,7 @@ export default async function ResumosPage() {
                       {r.enviado_em
                         ? <Badge tom="ok" className="px-1.5 py-0 text-[10px]">enviado por {r.canal}</Badge>
                         : <Badge tom="neutro" className="px-1.5 py-0 text-[10px]">só no painel</Badge>}
-                      <span className="tabular">
+                      <span className="tabular" title={`Atualizado em ${new Date(r.atualizado_em).toLocaleString('pt-BR')}`}>
                         {new Date(r.competencia + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </span>
                     </span>

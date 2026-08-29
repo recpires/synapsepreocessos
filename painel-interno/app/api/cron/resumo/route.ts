@@ -116,11 +116,17 @@ export async function GET(req: NextRequest) {
   }
 
   const corpo = secoes.join('\n\n')
-  const titulo = vencidos.length
-    ? `${vencidos.length} vencimento(s) atrasado(s)`
-    : criticos.length
-      ? `${criticos.length} vencimento(s) esta semana`
-      : 'Semana sem pendência'
+
+  // O título precisa refletir tudo que o corpo mostra. A primeira versão olhava
+  // só vencimentos e anunciava "semana sem pendência" com três projetos em
+  // risco listados logo abaixo — quem lesse só o cabeçalho teria a impressão
+  // contrária à dos dados.
+  const titulo = [
+    vencidos.length && `${vencidos.length} vencimento(s) atrasado(s)`,
+    errosCriticos.length && `${errosCriticos.length} erro(s) crítico(s)`,
+    criticos.length && `${criticos.length} vencimento(s) esta semana`,
+    emRisco.length && `${emRisco.length} projeto(s) em risco`,
+  ].filter(Boolean).slice(0, 2).join(' · ') || 'Semana sem pendência'
 
   const { error } = await sb.from('resumos').upsert(
     {
@@ -135,6 +141,7 @@ export async function GET(req: NextRequest) {
         projetos_em_risco: emRisco.length,
         propostas_abertas: propostasAbertas.length,
       },
+      atualizado_em: new Date().toISOString(),
     },
     { onConflict: 'competencia' }
   )
