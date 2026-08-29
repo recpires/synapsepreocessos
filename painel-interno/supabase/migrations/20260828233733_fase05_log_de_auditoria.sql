@@ -31,43 +31,47 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+-- Nota: esta versão calcula o resumo depois de reduzir o registro ao diff, o
+-- que fazia todo UPDATE sair sem rótulo. Corrigido logo em seguida, na
+-- migration 20260828233811. Mantido aqui como foi aplicado.
 declare
   v_membro  public.membros%rowtype;
   v_id      uuid;
   v_resumo  text;
-  v_cheio   jsonb;
   v_antes   jsonb;
   v_depois  jsonb;
 begin
   select * into v_membro from public.membros
    where user_id = (select auth.uid()) and ativo;
 
-  -- Linha completa, para tirar o rótulo antes de qualquer redução. Calcular o
-  -- resumo depois do diff fazia todo UPDATE sair sem rótulo, porque o campo
-  -- que dá nome à linha raramente é o que mudou.
-  v_cheio := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
-  v_id    := (v_cheio->>'id')::uuid;
+  if tg_op = 'DELETE' then
+    v_antes  := to_jsonb(old);
+    v_id     := (v_antes->>'id')::uuid;
+  else
+    v_depois := to_jsonb(new);
+    v_id     := (v_depois->>'id')::uuid;
+    if tg_op = 'UPDATE' then
+      v_antes := to_jsonb(old);
+      -- Guarda só o que mudou. Linha inteira a cada update inflaria o log
+      -- e esconderia a informação útil.
+      select jsonb_object_agg(key, value) into v_depois
+      from jsonb_each(to_jsonb(new))
+      where to_jsonb(new)->key is distinct from to_jsonb(old)->key
+        and key not in ('updated_at');
+      if v_depois is null then return null; end if;  -- nada relevante mudou
+      select jsonb_object_agg(key, v_antes->key) into v_antes
+      from jsonb_object_keys(v_depois) key;
+    end if;
+  end if;
 
   v_resumo := coalesce(
-    v_cheio->>'nome', v_cheio->>'titulo', v_cheio->>'descricao',
-    v_cheio->>'razao_social', v_cheio->>'cliente', v_cheio->>'numero'
+    (coalesce(v_depois, v_antes)->>'nome'),
+    (coalesce(v_depois, v_antes)->>'titulo'),
+    (coalesce(v_depois, v_antes)->>'descricao'),
+    (coalesce(v_depois, v_antes)->>'razao_social'),
+    (coalesce(v_depois, v_antes)->>'cliente'),
+    (coalesce(v_depois, v_antes)->>'numero')
   );
-
-  if tg_op = 'DELETE' then
-    v_antes := v_cheio;
-  elsif tg_op = 'INSERT' then
-    v_depois := v_cheio;
-  else
-    -- Guarda só o que mudou. Linha inteira a cada update inflaria o log
-    -- e esconderia a informação útil.
-    select jsonb_object_agg(key, value) into v_depois
-    from jsonb_each(to_jsonb(new))
-    where to_jsonb(new)->key is distinct from to_jsonb(old)->key
-      and key not in ('updated_at');
-    if v_depois is null then return null; end if;  -- nada relevante mudou
-    select jsonb_object_agg(key, to_jsonb(old)->key) into v_antes
-    from jsonb_object_keys(v_depois) key;
-  end if;
 
   insert into public.atividades (membro_id, autor, acao, entidade, entidade_id, resumo, antes, depois)
   values (v_membro.id, coalesce(v_membro.nome, 'sistema'), lower(tg_op),

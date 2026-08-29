@@ -57,8 +57,28 @@ jobs:
       # ou o SBP_… que a integração do Supabase com o GitHub gera sozinha.
       - name: Banco e repositório em sincronia
         run: |
+          set -o pipefail
           supabase link --project-ref bdfgmgxajzyjtunetnuw
-          supabase migration list --linked
+          supabase migration list --linked | tee lista.txt
+
+          # `migration list` sai com código 0 mesmo com divergência — ele só
+          # imprime a tabela. Sem esta checagem o job passa sempre, o que é
+          # pior do que não existir: dá sensação de cobertura sem cobrir nada.
+          #
+          # Só linha "remoto sem local" reprova. Migration nova que ainda não
+          # foi aplicada é o estado normal de um PR; o perigo é o inverso —
+          # mudança no banco sem arquivo no git, que foi o que causou o E-03.
+          # Linha órfã tem a coluna Local vazia — literalmente "` `" antes do
+          # primeiro pipe. Verificado contra a saída real do CLI.
+          orfas=$(grep -E '^\s*`\s+`\s*\|' lista.txt | grep -oE '`[0-9]{14}`' || true)
+
+          if [ -n "$orfas" ]; then
+            echo "::error::O banco tem migration que não está no git:"
+            echo "$orfas"
+            echo "Traga o SQL para supabase/migrations/ antes de seguir."
+            exit 1
+          fi
+          echo "Sem migration órfã no remoto."
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN || secrets.SBP_177E9E0B904A73294BF7BAEFEA421F99A9D4584E }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
