@@ -1,0 +1,3 @@
+ALTER TABLE despesas
+  ADD COLUMN IF NOT EXISTS periodicidade TEXT,
+  ADD COLUMN IF NOT EXISTS proxima_data  DATE;

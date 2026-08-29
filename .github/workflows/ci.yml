@@ -1,0 +1,60 @@
+name: CI — painel interno
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: painel-interno
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: painel-interno/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          # Valores de fachada: o build não acessa o banco, mas o cliente
+          # Supabase exige que as variáveis existam.
+          NEXT_PUBLIC_SUPABASE_URL: https://exemplo.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: chave-de-build
+
+      # Ainda não bloqueia: o código herdado tem 42 erros de lint (a maioria
+      # react-hooks/set-state-in-effect). Some conforme os módulos são
+      # reescritos nas Fases 02 a 05 — aí este passo vira obrigatório.
+      - name: Lint (informativo)
+        run: npm run lint
+        continue-on-error: true
+
+  schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Falha se o banco remoto tiver migration que não está no git, ou o
+      # contrário. Foi essa divergência que causou o E-03.
+      - name: Banco e repositório em sincronia
+        run: supabase migration list --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: bdfgmgxajzyjtunetnuw
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

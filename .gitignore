@@ -3,3 +3,10 @@ git-push.bat
 *.log
 .DS_Store
 Thumbs.db
+
+# Estado de runtime de ferramentas — não é código do projeto
+.claude-flow/
+.claude/settings.local.json
+
+# Backups locais do painel (contêm dados financeiros)
+painel-interno/backups/

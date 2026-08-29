@@ -2,19 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Tokens
+
+   Valores em triplas "R G B" para o Tailwind conseguir aplicar opacidade:
+   `bg-surface/60` vira rgb(var(--surface) / 0.6).
+
+   O tema escuro reproduz exatamente os hex que o painel já usava, então
+   migrar uma tela para os tokens não muda nada visualmente. O tema claro é
+   desenhado, não é inversão automática.
+
+   Três estados de tema: o padrão do sistema não carimba nada no <html>, por
+   isso a media query. Uma escolha explícita carimba data-theme e vence.
+   ───────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --bg: #0a0a0f;
-  --surface: #111118;
-  --border: #1e1e2e;
+  /* Superfícies */
+  --ground:      247 247 250;   /* #f7f7fa */
+  --surface:     255 255 255;   /* #ffffff */
+  --surface-2:   241 241 246;   /* #f1f1f6 */
+  --surface-3:   232 232 240;   /* #e8e8f0 */
+  --line:        228 228 236;   /* #e4e4ec */
+  --line-strong: 208 208 220;   /* #d0d0dc */
+
+  /* Texto */
+  --fg:          22 22 29;      /* #16161d */
+  --fg-muted:    90 90 107;     /* #5a5a6b */
+  --fg-subtle:   138 138 156;   /* #8a8a9c */
+
+  /* Acento */
+  --accent:       109 40 217;   /* #6d28d9 — mais escuro no claro, por contraste */
+  --accent-hover:  91 33 182;   /* #5b21b6 */
+  --accent-fg:    255 255 255;
+  --accent-soft:  237 233 254;  /* #ede9fe */
+  --accent-text:   91 33 182;
+
+  /* Semânticas */
+  --ok:        4 120 87;    --ok-soft:   209 250 229;  --ok-line:   167 243 208;
+  --warn:    146 100 8;     --warn-soft: 254 243 199;  --warn-line: 253 230 138;
+  --crit:    185 28 28;     --crit-soft: 254 226 226;  --crit-line: 254 202 202;
+  --info:     29 78 216;    --info-soft: 219 234 254;  --info-line: 191 219 254;
+
+  --raio: 0.5rem;
 }
 
-body {
-  background-color: var(--bg);
-  color: #e2e8f0;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ground:       10 10 15;    /* #0a0a0f */
+    --surface:      17 17 24;    /* #111118 */
+    --surface-2:    26 26 36;    /* #1a1a24 */
+    --surface-3:    34 34 50;    /* #222232 */
+    --line:         30 30 46;    /* #1e1e2e */
+    --line-strong:  45 45 61;    /* #2d2d3d */
+
+    --fg:          226 232 240;  /* #e2e8f0 */
+    --fg-muted:    156 163 175;  /* #9ca3af */
+    --fg-subtle:   107 114 128;  /* #6b7280 */
+
+    --accent:       124 58 237;  /* #7c3aed */
+    --accent-hover: 139 92 246;  /* #8b5cf6 */
+    --accent-fg:    255 255 255;
+    --accent-soft:   46 21 92;
+    --accent-text:  196 181 253;
+
+    --ok:    110 231 183;  --ok-soft:    6 59 42;   --ok-line:   6 95 70;
+    --warn:  252 211 77;   --warn-soft: 61 43 6;    --warn-line: 146 100 8;
+    --crit:  252 165 165;  --crit-soft: 62 17 17;   --crit-line: 153 27 27;
+    --info:  147 197 253;  --info-soft: 12 34 78;   --info-line: 30 64 175;
+  }
 }
+
+:root[data-theme='dark'] {
+  --ground:       10 10 15;
+  --surface:      17 17 24;
+  --surface-2:    26 26 36;
+  --surface-3:    34 34 50;
+  --line:         30 30 46;
+  --line-strong:  45 45 61;
+
+  --fg:          226 232 240;
+  --fg-muted:    156 163 175;
+  --fg-subtle:   107 114 128;
+
+  --accent:       124 58 237;
+  --accent-hover: 139 92 246;
+  --accent-fg:    255 255 255;
+  --accent-soft:   46 21 92;
+  --accent-text:  196 181 253;
+
+  --ok:    110 231 183;  --ok-soft:    6 59 42;   --ok-line:   6 95 70;
+  --warn:  252 211 77;   --warn-soft: 61 43 6;    --warn-line: 146 100 8;
+  --crit:  252 165 165;  --crit-soft: 62 17 17;   --crit-line: 153 27 27;
+  --info:  147 197 253;  --info-soft: 12 34 78;   --info-line: 30 64 175;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
 
 * {
   box-sizing: border-box;
+}
+
+body {
+  background-color: rgb(var(--ground));
+  color: rgb(var(--fg));
+}
+
+/* Números em coluna alinham quando têm a mesma largura. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 ::-webkit-scrollbar {
@@ -22,12 +117,26 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #111118;
+  background: rgb(var(--surface));
 }
 ::-webkit-scrollbar-thumb {
-  background: #2d2d3d;
+  background: rgb(var(--line-strong));
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3d3d5c;
+  background: rgb(var(--fg-subtle));
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

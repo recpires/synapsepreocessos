@@ -8,25 +8,19 @@ import { SUBNAV } from '@/lib/nav'
 import {
   type Contrato,
   type ContratoInsert,
-  type Template,
   TIPOS_CONTRATO,
   RESPONSAVEIS,
   STATUS_CORES,
   STATUS_LABEL,
-  TEMPLATES,
-} from '@/types/contratos'
+} from '@/types/empresas'
+import { renderizar, type TemplateContrato } from '@/lib/templates'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TemplateDB = {
-  id: string
-  nome: string
-  descricao?: string
-  tipo: string
-  conteudo_html: string
-  campos: { key: string; label: string }[]
-  created_at: string
-}
+// Os templates vêm todos da tabela `contrato_templates`. Antes havia dois
+// caminhos: os três embutidos em types/contratos.ts e os customizados do
+// banco. Agora é um só.
+type TemplateDB = TemplateContrato & { created_at?: string }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -171,7 +165,7 @@ function ModalTemplate({ open, template, onClose, onSave }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const campos = extrairCampos(html).map(key => ({ key, label: key.replace(/_/g, ' ') }))
+    const campos = extrairCampos(html).map(key => ({ key, label: key.replace(/_/g, ' '), tipo: 'text' as const }))
     await onSave({ nome, descricao, tipo, conteudo_html: html, campos })
     setSaving(false)
   }
@@ -233,73 +227,6 @@ function ModalTemplate({ open, template, onClose, onSave }: {
             <button type="submit" disabled={saving || !html.trim()}
               className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
               {saving ? 'Salvando…' : 'Salvar Template'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ─── Modal: Usar template (preencher campos) ──────────────────────────────────
-
-function ModalUsarTemplate({ open, template, onClose, onGerar }: {
-  open: boolean
-  template: TemplateDB | null
-  onClose: () => void
-  onGerar: (html: string) => void
-}) {
-  const [dados, setDados] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    if (open && template) {
-      const init: Record<string, string> = {}
-      template.campos.forEach(c => { init[c.key] = '' })
-      setDados(init)
-    }
-  }, [open, template])
-
-  if (!open || !template) return null
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    let html = template!.conteudo_html
-    Object.entries(dados).forEach(([key, val]) => {
-      html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), val)
-    })
-    onGerar(html)
-  }
-
-  const inp = `w-full bg-[#0a0a0f] border border-[#2d2d3d] rounded-lg px-3 py-2 text-white text-sm
-    focus:outline-none focus:border-violet-600 transition-colors`
-  const lbl = 'block text-xs text-gray-400 mb-1'
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-[#1e1e2e]">
-          <h2 className="font-semibold text-white">Preencher: {template.nome}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-3">
-          {template.campos.length === 0 ? (
-            <p className="text-gray-500 text-sm">Este template não tem campos variáveis.</p>
-          ) : template.campos.map(campo => (
-            <div key={campo.key}>
-              <label className={lbl}>{campo.label || campo.key}</label>
-              <input type="text" value={dados[campo.key] ?? ''} required
-                onChange={e => setDados(d => ({ ...d, [campo.key]: e.target.value }))}
-                placeholder={`{{${campo.key}}}`} className={inp} />
-            </div>
-          ))}
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 bg-[#1e1e2e] hover:bg-[#2d2d3d] text-gray-300 font-medium py-2.5 rounded-lg transition-colors text-sm">
-              Cancelar
-            </button>
-            <button type="submit"
-              className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
-              Visualizar →
             </button>
           </div>
         </form>
@@ -427,21 +354,33 @@ function ModalContrato({ open, onClose, onSave }: {
   )
 }
 
+
 // ─── Modal: Gerar via templates built-in ─────────────────────────────────────
 
-function ModalGerador({ open, onClose, onSave }: {
-  open: boolean; onClose: () => void; onSave: (c: ContratoInsert) => Promise<void>
+function ModalGerador({ open, templates, inicial, onClose, onSave }: {
+  open: boolean; templates: TemplateDB[]; inicial?: TemplateDB | null
+  onClose: () => void; onSave: (c: ContratoInsert) => Promise<void>
 }) {
   const [etapa, setEtapa]   = useState<'escolha' | 'preenche' | 'preview'>('escolha')
-  const [template, setTpl]  = useState<Template | null>(null)
+  const [template, setTpl]  = useState<TemplateDB | null>(null)
   const [dados, setDados]   = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const printRef            = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { if (open) { setEtapa('escolha'); setTpl(null); setDados({}) } }, [open])
+  // Abrir pelo botao 'Usar' da aba Templates ja pula a escolha.
+  useEffect(() => {
+    if (!open) return
+    if (inicial) {
+      setTpl(inicial)
+      setDados(Object.fromEntries(inicial.campos.map(c => [c.key, ''])))
+      setEtapa('preenche')
+    } else {
+      setEtapa('escolha'); setTpl(null); setDados({})
+    }
+  }, [open, inicial])
   if (!open) return null
 
-  function escolher(t: Template) {
+  function escolher(t: TemplateDB) {
     setTpl(t)
     const init: Record<string, string> = {}
     t.campos.forEach(c => { init[c.key] = '' })
@@ -464,13 +403,13 @@ function ModalGerador({ open, onClose, onSave }: {
     const valorKey   = template.campos.find(c => c.key.includes('valor'))?.key
     await onSave({
       cliente: dados[clienteKey] ?? '—',
-      tipo: template.id === 'nda' ? 'NDA' : template.id === 'saas' ? 'SaaS' : 'Desenvolvimento',
+      tipo: template.tipo,
       status: 'pendente_assinatura',
       valor: valorKey ? parseFloat(dados[valorKey]) || undefined : undefined,
       data_inicio: dados['data_inicio'] ?? new Date().toISOString().split('T')[0],
       responsavel: dados['responsavel'] ?? 'Rodrigo',
       observacao: `Gerado via template: ${template.nome}`,
-      gerado_por_template: true, template_tipo: template.id,
+      gerado_por_template: true, template_tipo: template.tipo,
       lado: 'cliente', created_by: 'painel',
     })
     setSaving(false)
@@ -497,7 +436,7 @@ function ModalGerador({ open, onClose, onSave }: {
 
         {etapa === 'escolha' && (
           <div className="p-5 space-y-3">
-            {TEMPLATES.map(t => (
+            {templates.map(t => (
               <button key={t.id} onClick={() => escolher(t)}
                 className="w-full text-left bg-[#0a0a0f] hover:bg-[#1e1e2e] border border-[#2d2d3d] hover:border-violet-600/40 rounded-xl p-4 transition-all group">
                 <p className="font-medium text-white group-hover:text-violet-300 transition-colors">{t.nome}</p>
@@ -551,7 +490,7 @@ function ModalGerador({ open, onClose, onSave }: {
               </button>
             </div>
             <div ref={printRef} className="bg-white rounded-xl overflow-hidden"
-              dangerouslySetInnerHTML={{ __html: template.gerar(dados) }} />
+              dangerouslySetInnerHTML={{ __html: renderizar(template.conteudo_html, dados) }} />
           </div>
         )}
       </div>
@@ -800,9 +739,8 @@ export default function ContratosPage() {
   const [aba, setAba]                   = useState<'contratos' | 'templates'>('contratos')
   const [modalUpload, setModalUpload]   = useState(false)
   const [modalGerador, setModalGerador] = useState(false)
-  const [modalUsarTpl, setModalUsarTpl] = useState(false)
   const [tplParaUsar, setTplParaUsar]   = useState<TemplateDB | null>(null)
-  const [previewHtml, setPreviewHtml]   = useState<string | null>(null)
+  const [templates, setTemplates]       = useState<TemplateDB[]>([])
 
   const fetchContratos = useCallback(async () => {
     setLoading(true)
@@ -816,7 +754,13 @@ export default function ContratosPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { fetchContratos() }, [fetchContratos])
+  const fetchTemplates = useCallback(async () => {
+    const { data } = await supabase
+      .from('contrato_templates').select('*').eq('ativo', true).order('nome')
+    setTemplates((data as TemplateDB[]) ?? [])
+  }, [supabase])
+
+  useEffect(() => { fetchContratos(); fetchTemplates() }, [fetchContratos, fetchTemplates])
 
   async function handleSave(c: ContratoInsert, file?: File) {
     let arquivo_url: string | undefined
@@ -913,42 +857,17 @@ export default function ContratosPage() {
             />
           )
         ) : (
-          <AbaTemplates onUsar={t => { setTplParaUsar(t); setModalUsarTpl(true) }} />
+          <AbaTemplates onUsar={t => { setTplParaUsar(t); setModalGerador(true) }} />
         )}
       </div>
 
-      {/* Preview de template customizado preenchido */}
-      {previewHtml && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-[#1e1e2e]">
-              <h2 className="font-semibold text-white">Pré-visualização</h2>
-              <button onClick={() => setPreviewHtml(null)} className="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
-            </div>
-            <div className="p-5">
-              <button onClick={() => {
-                const win = window.open('', '_blank')
-                if (!win) return
-                win.document.write(`<!DOCTYPE html><html><head><title>Contrato</title>
-                  <style>*{margin:0;padding:0;box-sizing:border-box}body{background:#fff}</style>
-                </head><body>${previewHtml}</body></html>`)
-                win.document.close(); win.focus(); win.print()
-              }} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors mb-5">
-                🖨️ Imprimir / PDF
-              </button>
-              <div className="bg-white rounded-xl overflow-hidden" dangerouslySetInnerHTML={{ __html: previewHtml }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       <ModalContrato  open={modalUpload}  onClose={() => setModalUpload(false)}  onSave={handleSave} />
-      <ModalGerador   open={modalGerador} onClose={() => setModalGerador(false)} onSave={handleSaveGerado} />
-      <ModalUsarTemplate
-        open={modalUsarTpl}
-        template={tplParaUsar}
-        onClose={() => setModalUsarTpl(false)}
-        onGerar={html => { setModalUsarTpl(false); setPreviewHtml(html) }}
+      <ModalGerador
+        open={modalGerador}
+        templates={templates}
+        inicial={tplParaUsar}
+        onClose={() => { setModalGerador(false); setTplParaUsar(null) }}
+        onSave={handleSaveGerado}
       />
     </PainelShell>
   )

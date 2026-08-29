@@ -5,18 +5,28 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { TemaToggle } from '@/components/ui'
+import { BuscaGlobal } from '@/components/BuscaGlobal'
 
 const NAV = [
   { href: '/overview',   icon: '🏠', label: 'Visão Geral' },
+  { href: '/projetos',   icon: '🗂️', label: 'Projetos' },
   { href: '/produtos',   icon: '📦', label: 'Produtos' },
+  { href: '/sites',      icon: '🌐', label: 'Sites' },
+  { href: '/empresas',   icon: '🏛️', label: 'Empresas' },
   { href: '/dev',        icon: '⚙️',  label: 'Desenvolvimento' },
   { href: '/pipeline',   icon: '📈', label: 'Pipeline' },
   { href: '/comercial',  icon: '💼', label: 'Comercial' },
   { href: '/marketing',  icon: '📣', label: 'Marketing' },
   { href: '/financeiro', icon: '💰', label: 'Financeiro' },
-  { href: '/empresa',    icon: '🏢', label: 'Empresa' },
+  // Rota antiga: gaveta de documentos e contratos. O cadastro de empresas
+  // agora é /empresas — o rótulo evita as duas parecerem a mesma coisa.
+  { href: '/empresa',    icon: '🗄️', label: 'Arquivos' },
   { href: '/time',       icon: '👥', label: 'Time' },
   { href: '/processos',  icon: '📋', label: 'Processos' },
+  { href: '/conhecimento', icon: '📚', label: 'Conhecimento' },
+  { href: '/vencimentos', icon: '⏰', label: 'Vencimentos' },
+  { href: '/config/atividades', icon: '🕘', label: 'Atividades' },
 ]
 
 // Grupos: rotas filhas que destacam a aba pai no sidebar
@@ -58,7 +68,7 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
     <aside
       className={[
         // Base
-        'bg-[#111118] border-r border-[#1e1e2e] flex flex-col transition-[width] duration-200 ease-out',
+        'bg-surface border-r border-line flex flex-col transition-[width] duration-200 ease-out',
         // Largura: mobile sempre w-64, desktop varia
         'w-64',
         showCollapsed ? 'md:w-16' : 'md:w-56',
@@ -71,12 +81,12 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
       aria-hidden={!open ? undefined : false}
     >
       {/* Logo + close (mobile) */}
-      <div className={`border-b border-[#1e1e2e] flex items-center ${showCollapsed ? 'md:justify-center md:px-2 px-4' : 'px-4 justify-between'} py-4`}>
+      <div className={`border-b border-line flex items-center ${showCollapsed ? 'md:justify-center md:px-2 px-4' : 'px-4 justify-between'} py-4`}>
         <div className={`flex items-center gap-2.5 min-w-0 ${showCollapsed ? 'md:gap-0' : ''}`}>
           <Image src="/logo.png" alt="Synapse Code" width={28} height={28} className="rounded-lg flex-shrink-0" />
           <div className={showCollapsed ? 'md:hidden' : ''}>
-            <div className="text-sm font-semibold text-white leading-tight">Synapse Code</div>
-            <div className="text-[11px] text-gray-500">Painel Interno</div>
+            <div className="text-sm font-semibold text-fg leading-tight">Synapse Code</div>
+            <div className="text-[11px] text-subtle">Painel Interno</div>
           </div>
         </div>
         {onClose && (
@@ -84,11 +94,16 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
             type="button"
             onClick={onClose}
             aria-label="Fechar menu"
-            className="md:hidden p-1.5 -mr-1 rounded text-gray-500 hover:text-white hover:bg-[#1e1e2e] transition-colors text-xl leading-none"
+            className="md:hidden p-1.5 -mr-1 rounded text-subtle hover:text-fg hover:bg-surface-2 transition-colors text-xl leading-none"
           >
             &times;
           </button>
         )}
+      </div>
+
+      {/* Busca global — Ctrl+K de qualquer tela */}
+      <div className={`px-2 pt-3 ${showCollapsed ? 'md:hidden' : ''}`}>
+        <BuscaGlobal />
       </div>
 
       {/* Nav */}
@@ -106,8 +121,8 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
                 showCollapsed ? 'md:justify-center md:px-0 md:py-2.5 gap-2.5 px-3 py-2.5' : 'gap-2.5 px-3 py-2.5'
               } ${
                 active
-                  ? 'bg-violet-600/20 text-violet-300 font-medium'
-                  : 'text-gray-400 hover:text-white hover:bg-[#1e1e2e]'
+                  ? 'bg-accent-soft text-accent-text font-medium'
+                  : 'text-muted hover:text-fg hover:bg-surface-2'
               }`}
             >
               <span className="text-base leading-none flex-shrink-0">{item.icon}</span>
@@ -119,13 +134,13 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
 
       {/* Toggle collapse — só desktop */}
       {onToggleCollapsed && (
-        <div className={`hidden md:flex border-t border-[#1e1e2e] ${showCollapsed ? 'justify-center px-1' : 'justify-end px-3'} py-2`}>
+        <div className={`hidden md:flex border-t border-line ${showCollapsed ? 'justify-center px-1' : 'justify-end px-3'} py-2`}>
           <button
             type="button"
             onClick={onToggleCollapsed}
             title={showCollapsed ? 'Expandir menu' : 'Recolher menu'}
             aria-label={showCollapsed ? 'Expandir menu' : 'Recolher menu'}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-white hover:bg-[#1e1e2e] transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-subtle hover:text-fg hover:bg-surface-2 transition-colors"
           >
             <svg
               width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -139,32 +154,38 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
       )}
 
       {/* Footer */}
-      <div className={`border-t border-[#1e1e2e] px-4 py-3 ${showCollapsed ? 'md:px-1 md:py-2' : ''}`}>
+      <div className={`border-t border-line px-4 py-3 ${showCollapsed ? 'md:px-1 md:py-2' : ''}`}>
         {/* Desktop colapsado: só ícone de logout */}
         {showCollapsed && (
-          <button
-            onClick={handleLogout}
-            title={`Sair (${email})`}
-            aria-label="Sair"
-            className="hidden md:flex items-center justify-center w-8 h-8 mx-auto rounded-lg text-gray-500 hover:text-red-400 hover:bg-[#1e1e2e] transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
+          <div className="hidden md:flex flex-col items-center gap-1">
+            <TemaToggle compacto />
+            <button
+              onClick={handleLogout}
+              title={`Sair (${email})`}
+              aria-label="Sair"
+              className="flex items-center justify-center w-8 h-8 rounded-lg text-subtle hover:text-crit hover:bg-surface-2 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </div>
         )}
 
         {/* Mobile sempre + Desktop expandido: email + link Sair */}
         <div className={showCollapsed ? 'md:hidden' : ''}>
-          <div className="text-[11px] text-gray-600 truncate mb-2">{email}</div>
-          <button
-            onClick={handleLogout}
-            className="text-xs text-gray-500 hover:text-white transition-colors"
-          >
-            Sair
-          </button>
+          <div className="text-[11px] text-subtle truncate mb-2">{email}</div>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={handleLogout}
+              className="text-xs text-subtle hover:text-fg transition-colors"
+            >
+              Sair
+            </button>
+            <TemaToggle />
+          </div>
         </div>
       </div>
     </aside>

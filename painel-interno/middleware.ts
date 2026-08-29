@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // Webhooks externos (Asaas) chegam sem cookie de sessão e se autenticam pelo
+  // próprio token no header. Sem esta saída antecipada o middleware devolve
+  // redirect 307 para /login e o handler nunca roda.
+  if (request.nextUrl.pathname.startsWith('/api/webhooks/')) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
