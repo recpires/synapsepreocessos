@@ -15,9 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 24 é a versão em que o projeto é desenvolvido e onde os testes rodam
+      # com type stripping nativo — sem isso o runner do Node não lê `.ts`.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: painel-interno/package-lock.json
 
@@ -25,6 +27,12 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      # Bloqueante desde o primeiro dia, ao contrário do lint: são as regras
+      # que produzem número errado com aparência de certo — fatia de sócio,
+      # parcela de dívida, valor em contrato e recorte por empresa.
+      - name: Testes
+        run: npm test
 
       - name: Build
         run: npm run build
