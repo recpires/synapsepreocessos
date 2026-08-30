@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import { ArquivoLink } from '@/components/ArquivoLink'
 import SubNav from '@/components/SubNav'
 import { SUBNAV } from '@/lib/nav'
 import {
@@ -711,7 +712,7 @@ function ListaContratos({ contratos, onDelete, onAdd, onGerar }: {
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{c.responsavel}</td>
                       <td className="px-4 py-3 text-center">
                         {c.arquivo_url
-                          ? <a href={c.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 transition-colors">📄</a>
+                          ? <ArquivoLink bucket="contratos-arquivos" valor={c.arquivo_url} className="text-violet-400 hover:text-violet-300 transition-colors">📄</ArquivoLink>
                           : <span className="text-gray-700">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -770,8 +771,9 @@ export default function ContratosPage() {
       const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { data: up, error } = await supabase.storage.from('contratos-arquivos').upload(path, file, { contentType: file.type, upsert: false })
       if (!error && up) {
-        const { data: url } = supabase.storage.from('contratos-arquivos').getPublicUrl(up.path)
-        arquivo_url = url.publicUrl; arquivo_nome = file.name
+        // Guarda o caminho, não URL pública: o bucket é privado e o acesso
+        // passa a ser por link assinado, gerado a cada abertura.
+        arquivo_url = up.path; arquivo_nome = file.name
       }
     }
     await supabase.from('contratos').insert({ ...c, lado: 'cliente', arquivo_url, arquivo_nome })

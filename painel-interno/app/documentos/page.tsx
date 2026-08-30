@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import { ArquivoLink } from '@/components/ArquivoLink'
 import SubNav from '@/components/SubNav'
 import { SUBNAV } from '@/lib/nav'
 
@@ -107,8 +108,8 @@ export default function DocumentosPage() {
         .upload(path, arquivo, { contentType: arquivo.type, upsert: false })
 
       if (!upErr && up) {
-        const { data: urlData } = supabase.storage.from('documentos-files').getPublicUrl(up.path)
-        arquivo_url = urlData.publicUrl
+        // Caminho, não URL pública — ver `server/arquivos.ts`.
+        arquivo_url = up.path
         arquivo_nome = arquivo.name
         arquivo_tipo = ext
         tamanho_bytes = arquivo.size
@@ -243,14 +244,13 @@ export default function DocumentosPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {doc.arquivo_url ? (
-                      <a
-                        href={doc.arquivo_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <ArquivoLink
+                        bucket="documentos-files"
+                        valor={doc.arquivo_url}
                         className="text-xs text-violet-400 hover:text-violet-300 transition-colors px-2 py-1 bg-violet-900/20 rounded-md"
                       >
                         ↓ Baixar
-                      </a>
+                      </ArquivoLink>
                     ) : (
                       <span className="text-xs text-gray-600 px-2 py-1">sem arquivo</span>
                     )}

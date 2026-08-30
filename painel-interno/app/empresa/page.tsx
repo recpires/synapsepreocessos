@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
+import { ArquivoLink } from '@/components/ArquivoLink'
 import SubNav from '@/components/SubNav'
 import { SUBNAV } from '@/lib/nav'
 import {
@@ -215,8 +216,8 @@ export default function EmpresaPage() {
         console.error('[empresa] erro no upload do arquivo:', upErr)
         alert(`Falha ao subir o PDF: ${upErr?.message ?? 'erro desconhecido'}\n\nO documento será salvo sem o anexo.`)
       } else {
-        const { data: url } = supabase.storage.from('contratos-arquivos').getPublicUrl(up.path)
-        arquivo_url  = url.publicUrl
+        // Caminho, não URL pública — ver `server/arquivos.ts`.
+        arquivo_url  = up.path
         arquivo_nome = file.name
       }
     }
@@ -425,7 +426,7 @@ export default function EmpresaPage() {
                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{c.responsavel}</td>
                         <td className="px-4 py-3 text-center">
                           {c.arquivo_url
-                            ? <a href={c.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 transition-colors">📄</a>
+                            ? <ArquivoLink bucket="contratos-arquivos" valor={c.arquivo_url} className="text-violet-400 hover:text-violet-300 transition-colors">📄</ArquivoLink>
                             : <span className="text-gray-700">—</span>}
                         </td>
                         <td className="px-4 py-3 text-right">

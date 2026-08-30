@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import PainelShell from '@/components/PainelShell'
+import { ArquivoLink } from '@/components/ArquivoLink'
 import { PageHeader, Erro, Badge, Card, CardHeader, CardBody, Vazio } from '@/components/ui'
 import { obterEmpresa } from '@/server/empresas'
 import { TIPO_EMPRESA_LABEL, diasAte, tomDoVencimento } from '@/types/empresas'
@@ -112,14 +113,13 @@ export default async function EmpresaPage({ params }: { params: Promise<{ id: st
                                 {d.descricao && <span className="block text-xs text-subtle">{d.descricao}</span>}
                               </span>
                               {d.arquivo_url && (
-                                <a
-                                  href={d.arquivo_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <ArquivoLink
+                                  bucket="documentos-files"
+                                  valor={d.arquivo_url}
                                   className="flex-shrink-0 text-xs text-accent hover:underline"
                                 >
                                   Abrir
-                                </a>
+                                </ArquivoLink>
                               )}
                             </li>
                           ))}
@@ -156,9 +156,9 @@ export default async function EmpresaPage({ params }: { params: Promise<{ id: st
                               </Badge>
                             )}
                             {c.arquivo_url && (
-                              <a href={c.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:underline">
+                              <ArquivoLink bucket="contratos-arquivos" valor={c.arquivo_url} className="text-xs text-accent hover:underline">
                                 Abrir
-                              </a>
+                              </ArquivoLink>
                             )}
                           </span>
                         </li>
