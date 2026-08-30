@@ -1,6 +1,8 @@
-'use client'
-
 import PainelShell from '@/components/PainelShell'
+import { Acessos } from './Acessos'
+import { listarAcessos } from '@/server/acessos'
+
+export const dynamic = 'force-dynamic'
 
 const CONTRATACOES = [
   { icon: '👨‍💻', cargo: 'Dev Frontend',  quando: 'quando Rodrigo estiver 80%+ no backend',         prazo: 'Próximo', cor: 'bg-amber-900/30 text-amber-400 border border-amber-800/40' },
@@ -15,7 +17,9 @@ const RITUAIS = [
   { icon: '📊', dia: 'Dia 1 do mês',  desc: 'Review financeiro: MRR, custos, churn, meta do próximo mês.' },
 ]
 
-export default function TimePage() {
+export default async function TimePage() {
+  const acessos = await listarAcessos()
+
   return (
     <PainelShell>
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
@@ -86,6 +90,26 @@ export default function TimePage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Acessos ao painel */}
+        <div className="rounded-xl border border-[#1e1e2e] bg-[#0d0d14] p-5">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-500">
+            Acesso ao painel
+          </p>
+          <p className="mb-4 text-xs text-gray-600">
+            Quem entra e quais empresas cada um enxerga. O isolamento vale no banco,
+            não só na tela: um usuário restrito não lê o dado da outra empresa nem
+            montando a requisição à mão.
+          </p>
+          {acessos.error ? (
+            <p className="text-sm text-red-400">{acessos.error}</p>
+          ) : (
+            <Acessos
+              inicial={acessos.data!.membros}
+              empresas={acessos.data!.empresas}
+            />
+          )}
         </div>
       </div>
     </PainelShell>
