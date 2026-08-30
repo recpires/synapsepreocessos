@@ -16,3 +16,6 @@ painel-interno/backups/
 painel-interno/[0-9]
 painel-interno/*.status
 painel-interno/b.margem
+
+# Testes de interface geram nada, mas o loader do tsx deixa cache
+.tsx-cache/
