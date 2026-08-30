@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import PainelShell from '@/components/PainelShell'
 import {
@@ -1208,7 +1208,7 @@ function ProjecaoView({ despesas, receitas, ultimaRenovacao }: { despesas: Despe
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function FinanceiroPage() {
+function FinanceiroConteudo() {
   const supabase = createClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -1541,5 +1541,19 @@ export default function FinanceiroPage() {
 
       <ModalDespesa open={modalOpen} editing={editing} duplicando={duplicando} empresas={empresas} onClose={closeModal} onSave={handleSave} onCancelarAssinatura={handleCancelarAssinatura} />
     </PainelShell>
+  )
+}
+
+/**
+ * O recorte por empresa vem de `useSearchParams`, que obriga a fronteira de
+ * Suspense: sem ela o Next tenta pré-renderizar a página como estática e o
+ * build quebra. `export const dynamic` não resolve aqui — configuração de rota
+ * é ignorada em client component.
+ */
+export default function FinanceiroPage() {
+  return (
+    <Suspense fallback={null}>
+      <FinanceiroConteudo />
+    </Suspense>
   )
 }

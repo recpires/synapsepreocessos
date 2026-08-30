@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
@@ -169,7 +169,7 @@ function ModalDocumento({ open, onClose, onSave }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function EmpresaPage() {
+function EmpresaConteudo() {
   const supabase = createClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -588,5 +588,19 @@ export default function EmpresaPage() {
 
       <ModalDocumento open={modal} onClose={() => setModal(false)} onSave={handleSave} />
     </PainelShell>
+  )
+}
+
+/**
+ * O recorte por empresa vem de `useSearchParams`, que obriga a fronteira de
+ * Suspense: sem ela o Next tenta pré-renderizar a página como estática e o
+ * build quebra. `export const dynamic` não resolve aqui — configuração de rota
+ * é ignorada em client component.
+ */
+export default function EmpresaPage() {
+  return (
+    <Suspense fallback={null}>
+      <EmpresaConteudo />
+    </Suspense>
   )
 }
