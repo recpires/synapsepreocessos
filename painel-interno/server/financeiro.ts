@@ -65,7 +65,7 @@ export async function listarRegrasRateio(
         sb.from('rateio_itens').select('*'),
         sb.from('produtos').select('id, nome'),
         porEmpresa(sb.from('despesas').select('descricao, categoria, valor, produto')
-          .lt('data', hojeISO()), empresaId),
+          .lt('data', hojeISO()).eq('confirmado', true), empresaId),
       ])
     if (e1) return { error: `regras: ${e1.message}` }
 
@@ -181,7 +181,8 @@ export async function obterPanoramaCustos(empresaId?: string): Promise<Resultado
       await Promise.all([
         porEmpresa(sb.from('custo_por_produto').select('*').lt('data', hoje), empresaId),
         sb.from('produtos').select('id, nome').order('ordem'),
-        porEmpresa(sb.from('despesas').select('data, valor, produto').lt('data', hoje), empresaId),
+        porEmpresa(sb.from('despesas').select('data, valor, produto')
+          .lt('data', hoje).eq('confirmado', true), empresaId),
         porEmpresa(sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true), empresaId),
       ])
     if (e1) return { error: `custo_por_produto: ${e1.message}` }
@@ -266,7 +267,7 @@ export async function listarSemDono(empresaId?: string): Promise<Resultado<
 
     const [{ data: despesas, error }, { data: regras }, { data: itens }] = await Promise.all([
       porEmpresa(sb.from('despesas').select('descricao, categoria, valor, produto')
-        .lt('data', hojeISO()), empresaId),
+        .lt('data', hojeISO()).eq('confirmado', true), empresaId),
       sb.from('rateio_regras').select('id, aplica_a, padrao, ativa').eq('ativa', true),
       sb.from('rateio_itens').select('regra_id, percentual'),
     ])
@@ -309,5 +310,65 @@ export async function listarSemDono(empresaId?: string): Promise<Resultado<
     }
   } catch (e) {
     return falha('listarSemDono', e)
+  }
+}
+
+/**
+ * Despesas que venceram e ninguém confirmou.
+ *
+ * É a contrapartida de `confirmado`: tirar a previsão vencida do resultado só
+ * é honesto se ela aparecer em algum lugar. Sem esta fila, a mudança
+ * esconderia o número em vez de corrigi-lo.
+ */
+export async function listarAConfirmar(empresaId?: string): Promise<Resultado<{
+  id: string; data: string; descricao: string; categoria: string; valor: number
+}[]>> {
+  try {
+    await assertMembro()
+    const sb = await createClient()
+    const { data, error } = await porEmpresa(
+      sb.from('despesas')
+        .select('id, data, descricao, categoria, valor')
+        .lte('data', hojeISO())
+        .eq('confirmado', false)
+        .order('data'),
+      empresaId
+    )
+    if (error) return { error: `a confirmar: ${error.message}` }
+    return {
+      data: (data ?? []).map(d => ({ ...d, valor: Number(d.valor) })) as {
+        id: string; data: string; descricao: string; categoria: string; valor: number
+      }[],
+    }
+  } catch (e) {
+    return falha('listarAConfirmar', e)
+  }
+}
+
+/**
+ * Confirma que o dinheiro saiu, ou apaga o que não vai sair.
+ *
+ * Apagar é o caminho da assinatura que acabou: a linha era previsão e nunca
+ * virou despesa. Confirmar é o caminho normal, e só então ela entra no
+ * resultado.
+ */
+export async function resolverPendencias(
+  ids: string[], acao: 'confirmar' | 'apagar'
+): Promise<{ ok: boolean; error?: string; linhas?: number }> {
+  try {
+    await assertMembro()
+    if (ids.length === 0) return { ok: true, linhas: 0 }
+    const sb = await createClient()
+
+    const { data, error } = acao === 'confirmar'
+      ? await sb.from('despesas').update({ confirmado: true }).in('id', ids).select('id')
+      : await sb.from('despesas').delete().in('id', ids).select('id')
+    if (error) return { ok: false, error: error.message }
+
+    revalidatePath('/financeiro')
+    revalidatePath('/overview')
+    return { ok: true, linhas: (data ?? []).length }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }

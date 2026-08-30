@@ -54,8 +54,10 @@ export async function montarDRE(
       await Promise.all([
         porEmpresa(sb.from('receitas').select('valor, tipo, categoria, status')
           .gte('data', inicio).lt('data', corte), empresaId),
+        // Só o confirmado entra no demonstrativo: a recorrência gera a linha
+        // futura, e ela não vira fato só porque a data passou.
         porEmpresa(sb.from('despesas').select('valor, categoria')
-          .gte('data', inicio).lt('data', corte), empresaId),
+          .gte('data', inicio).lt('data', corte).eq('confirmado', true), empresaId),
         porEmpresa(sb.from('impostos').select('valor')
           .gte('competencia', inicio).lt('competencia', corte), empresaId),
       ])

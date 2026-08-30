@@ -60,7 +60,9 @@ export async function obterCaixa(empresaId?: string): Promise<Resultado<Caixa>> 
       await Promise.all([
         porEmpresa(sb.from('contas_bancarias').select('*').order('nome'), empresaId),
         porEmpresa(sb.from('impostos').select('*').order('vencimento'), empresaId),
-        porEmpresa(sb.from('despesas').select('data, valor').lt('data', hoje), empresaId),
+        // Burn é o que saiu de fato; previsão vencida sem confirmação não conta.
+        porEmpresa(sb.from('despesas').select('data, valor')
+          .lt('data', hoje).eq('confirmado', true), empresaId),
       ])
     if (e1) return { error: `contas: ${e1.message}` }
     if (e2) return { error: `impostos: ${e2.message}` }

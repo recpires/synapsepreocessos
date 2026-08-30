@@ -8,6 +8,8 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, Legend,
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
+import { listarAConfirmar } from '@/server/financeiro'
+import { AConfirmar } from './AConfirmar'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar, escolher } from '@/components/Feedback'
 import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
@@ -1226,6 +1228,9 @@ function FinanceiroConteudo() {
 
   const [despesas, setDespesas]   = useState<Despesa[]>([])
   const [empresas, setEmpresas]   = useState<{ id: string; nome: string }[]>([])
+  const [pendencias, setPendencias] = useState<
+    { id: string; data: string; descricao: string; categoria: string; valor: number }[]
+  >([])
   const [receitas, setReceitas]   = useState<Receita[]>([])
   const [ultimaRenovacao, setUltimaRenovacao] = useState<string | null>(null)
   const [loading, setLoading]     = useState(true)
@@ -1246,6 +1251,10 @@ function FinanceiroConteudo() {
         .eq('tipo', 'propria').eq('ativa', true).order('razao_social'),
     ])
     setEmpresas((emp ?? []).map(e => ({ id: e.id, nome: e.nome_fantasia || e.razao_social })))
+    // Previsões que venceram sem confirmação. Ficam fora do resultado, então
+    // precisam de um lugar visível — senão a correção vira sumiço.
+    const pend = await listarAConfirmar(empresaFiltro || undefined)
+    setPendencias(pend.data ?? [])
     setDespesas(desp ?? [])
     setReceitas((rec as Receita[]) ?? [])
     setUltimaRenovacao(log?.[0]?.executado_em ?? null)
@@ -1527,6 +1536,8 @@ function FinanceiroConteudo() {
             </div>
           </div>
         )}
+
+        <AConfirmar pendencias={pendencias} />
 
         {loading ? (
           <div className="flex items-center justify-center py-32 text-gray-600">Carregando…</div>

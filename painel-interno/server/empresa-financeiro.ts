@@ -99,8 +99,10 @@ export async function listarPosicoes(): Promise<Resultado<PosicaoEmpresa[]>> {
         .gte('competencia', desde).lte('competencia', ate).eq('status', 'emitida'),
       sb.from('receitas').select('empresa_id, valor, status, data')
         .gte('data', desde).lte('data', ate),
+      // Realizado exige confirmação: previsão vencida fica na fila, não no
+      // resultado.
       sb.from('despesas').select('empresa_id, valor, data')
-        .gte('data', desde).lte('data', ate),
+        .gte('data', desde).lte('data', ate).eq('confirmado', true),
       sb.from('dividas_resumo').select('empresa_id, saldo_devedor, parcelas_atrasadas, status'),
       // Inclusive quem já saiu: a fatia é calculada por data, e ignorar o
       // histórico faria o período anterior à saída sumir da conta.
@@ -264,7 +266,8 @@ export async function listarSocios(empresaId: string): Promise<Resultado<{
       sb.from('receitas').select('valor, status, data')
         .eq('empresa_id', empresaId).gte('data', desde).lte('data', ate),
       sb.from('despesas').select('valor, data')
-        .eq('empresa_id', empresaId).gte('data', desde).lte('data', ate),
+        .eq('empresa_id', empresaId).gte('data', desde).lte('data', ate)
+        .eq('confirmado', true),
     ])
     if (error) return { error: `sócios: ${error.message}` }
 
