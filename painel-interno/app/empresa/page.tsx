@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
 import { ArquivoLink } from '@/components/ArquivoLink'
@@ -170,8 +171,21 @@ function ModalDocumento({ open, onClose, onSave }: {
 
 export default function EmpresaPage() {
   const supabase = createClient()
+  const router = useRouter()
+  const pathname = usePathname()
+  const params = useSearchParams()
+
+  // Mesmo recorte das telas financeiras, guardado na URL.
+  const empresaFiltro = params.get('empresa') ?? ''
+  function trocarEmpresa(id: string) {
+    const novo = new URLSearchParams(params.toString())
+    if (id) novo.set('empresa', id)
+    else novo.delete('empresa')
+    router.push(novo.toString() ? `${pathname}?${novo}` : pathname)
+  }
 
   const [documentos, setDocumentos] = useState<Contrato[]>([])
+  const [empresas, setEmpresas]     = useState<{ id: string; nome: string }[]>([])
   const [loading, setLoading]       = useState(true)
   const [modal, setModal]           = useState(false)
   const [busca, setBusca]           = useState('')
@@ -195,6 +209,10 @@ export default function EmpresaPage() {
       .select('*')
       .eq('lado', 'empresa')
       .order('data_inicio', { ascending: false })
+    const { data: emp } = await supabase
+      .from('empresas').select('id, razao_social, nome_fantasia')
+      .eq('tipo', 'propria').eq('ativa', true).order('razao_social')
+    setEmpresas((emp ?? []).map(e => ({ id: e.id, nome: e.nome_fantasia || e.razao_social })))
     setDocumentos((data as Contrato[]) ?? [])
     setLoading(false)
   }, [supabase])
@@ -254,10 +272,13 @@ export default function EmpresaPage() {
 
   // Filtros
   const filtrados = documentos.filter(c => {
+    // `empresa_id` aqui é a contraparte; quem responde pelo contrato é
+    // `empresa_propria_id`. Confundir os dois filtraria pelo fornecedor.
+    const matchEmpresa = !empresaFiltro || c.empresa_propria_id === empresaFiltro
     const matchBusca  = !busca || c.cliente.toLowerCase().includes(busca.toLowerCase())
     const matchTipo   = tipoFiltro === 'Todos' || c.tipo === tipoFiltro
     const matchStatus = statusFiltro === 'todos' || c.status === statusFiltro
-    return matchBusca && matchTipo && matchStatus
+    return matchEmpresa && matchBusca && matchTipo && matchStatus
   })
 
   const alertas = documentos.filter(c => {
@@ -321,6 +342,13 @@ export default function EmpresaPage() {
         <div className="flex flex-wrap gap-3 items-center">
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar fornecedor…" className={`${sel} w-full sm:w-48 placeholder-gray-600`} />
+          {empresas.length > 1 && (
+            <select value={empresaFiltro} onChange={e => trocarEmpresa(e.target.value)}
+              title="Filtrar pela nossa empresa que responde pelo contrato" className={sel}>
+              <option value="">🏢 Todas as empresas</option>
+              {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+            </select>
+          )}
           <select value={tipoFiltro} onChange={e => setTipo(e.target.value)} className={sel}>
             <option value="Todos">Todas as categorias</option>
             {TIPOS_CONTRATO_EMPRESA.map(t => <option key={t}>{t}</option>)}

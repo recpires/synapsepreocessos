@@ -147,7 +147,10 @@ export type Contrato = {
   arquivo_nome?: string
   gerado_por_template?: boolean
   template_tipo?: string
+  /** A contraparte: o cliente ou o fornecedor do outro lado do contrato. */
   empresa_id?: string | null
+  /** Qual CNPJ *nosso* responde pelo contrato. Distinto de `empresa_id`. */
+  empresa_propria_id?: string | null
   projeto_id?: string | null
   /** 'cliente' = acordo com terceiro · 'empresa' = a Synapse é a contratante */
   lado?: LadoContrato

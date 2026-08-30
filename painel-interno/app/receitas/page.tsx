@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import PainelShell from '@/components/PainelShell'
 import { createClient } from '@/lib/supabase/client'
 import { statusAsaas } from '@/server/integracoes'
@@ -405,6 +406,19 @@ function ModalReceita({ open, editing, empresas, onClose, onSave }: {
 
 export default function ReceitasPage() {
   const supabase = createClient()
+  const router = useRouter()
+  const pathname = usePathname()
+  const params = useSearchParams()
+
+  // Mesmo recorte das outras telas financeiras, guardado na URL: trocar de
+  // Receitas para o DRE mantém a empresa escolhida.
+  const empresaFiltro = params.get('empresa') ?? ''
+  function trocarEmpresa(id: string) {
+    const novo = new URLSearchParams(params.toString())
+    if (id) novo.set('empresa', id)
+    else novo.delete('empresa')
+    router.push(novo.toString() ? `${pathname}?${novo}` : pathname)
+  }
 
   const [receitas, setReceitas]   = useState<Receita[]>([])
   const [empresas, setEmpresas]   = useState<{ id: string; nome: string }[]>([])
@@ -537,6 +551,7 @@ export default function ReceitasPage() {
   // Filtros
   const { de, ate } = rangePeriodo(f.preset, f.de, f.ate)
   const filtradas = receitas.filter(r => {
+    const matchEmpresa = !empresaFiltro || r.empresa_id === empresaFiltro
     const matchPeriodo = r.data >= de && r.data <= ate
     const matchBusca   = !f.busca || (r.descricao ?? '').toLowerCase().includes(f.busca.toLowerCase()) ||
                                      (r.cliente   ?? '').toLowerCase().includes(f.busca.toLowerCase())
@@ -544,7 +559,7 @@ export default function ReceitasPage() {
     const matchOrigem  = f.origem  === 'Todos' || r.origem  === f.origem
     const matchStatus  = f.status  === 'Todos' || r.status  === f.status
     const matchCat     = f.categoria === 'Todas' || (r.categoria ?? 'Mensalidade') === f.categoria
-    return matchPeriodo && matchBusca && matchProduto && matchOrigem && matchStatus && matchCat
+    return matchEmpresa && matchPeriodo && matchBusca && matchProduto && matchOrigem && matchStatus && matchCat
   })
   const filtroAtivo = f.preset !== 'ano-atual' || f.busca || f.produto !== 'Todos' || f.origem !== 'Todos' || f.status !== 'Todos' || f.categoria !== 'Todas'
 
@@ -655,6 +670,18 @@ export default function ReceitasPage() {
 
         {/* Filtros */}
         <div className="flex flex-wrap gap-3 items-center">
+          {/* Só com mais de um CNPJ: com um só o campo não escolhe nada. */}
+          {empresas.length > 1 && (
+            <select
+              value={empresaFiltro}
+              onChange={e => trocarEmpresa(e.target.value)}
+              title="Filtrar por empresa"
+              className={sel}
+            >
+              <option value="">🏢 Todas as empresas</option>
+              {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+            </select>
+          )}
           <select value={f.preset} onChange={e => upd({ preset: e.target.value as PeriodoPreset })} className={sel}>
             {(Object.keys(PERIODO_LABEL) as PeriodoPreset[]).map(p => (
               <option key={p} value={p}>{PERIODO_LABEL[p]}</option>

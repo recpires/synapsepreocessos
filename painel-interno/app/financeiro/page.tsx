@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import PainelShell from '@/components/PainelShell'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -1209,6 +1210,19 @@ function ProjecaoView({ despesas, receitas, ultimaRenovacao }: { despesas: Despe
 
 export default function FinanceiroPage() {
   const supabase = createClient()
+  const router = useRouter()
+  const pathname = usePathname()
+  const params = useSearchParams()
+
+  // O recorte por empresa mora na URL, como nas outras telas financeiras: sair
+  // daqui para o DRE mantém a mesma empresa selecionada.
+  const empresaFiltro = params.get('empresa') ?? ''
+  function trocarEmpresa(id: string) {
+    const novo = new URLSearchParams(params.toString())
+    if (id) novo.set('empresa', id)
+    else novo.delete('empresa')
+    router.push(novo.toString() ? `${pathname}?${novo}` : pathname)
+  }
 
   const [despesas, setDespesas]   = useState<Despesa[]>([])
   const [empresas, setEmpresas]   = useState<{ id: string; nome: string }[]>([])
@@ -1411,7 +1425,17 @@ export default function FinanceiroPage() {
 
   // Dashboard considera só o REALIZADO (até hoje) — o futuro fica na aba Projeção
   const hojeISO = new Date().toISOString().slice(0, 10)
-  const despesasRealizadas = despesas.filter(d => d.data <= hojeISO)
+  // Um filtro só, aplicado na origem: dashboard, lista, projeção e o alerta de
+  // vencimento derivam daqui, então nenhum deles pode ficar para trás e mostrar
+  // número de outra empresa.
+  const daEmpresa = empresaFiltro
+    ? despesas.filter(d => d.empresa_id === empresaFiltro)
+    : despesas
+  const receitasDaEmpresa = empresaFiltro
+    ? receitas.filter(r => r.empresa_id === empresaFiltro)
+    : receitas
+
+  const despesasRealizadas = daEmpresa.filter(d => d.data <= hojeISO)
 
   // Meses disponíveis para o filtro global (só meses já realizados)
   const mesesDisponiveis = Array.from(new Set(despesasRealizadas.map(d => d.data.slice(0, 7)))).sort().reverse()
@@ -1424,7 +1448,7 @@ export default function FinanceiroPage() {
   // Alertas de vencimento — despesas a vencer nos próximos 7 dias
   const hojeStr = new Date().toISOString().slice(0, 10)
   const limiteStr = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
-  const aVencer = despesas
+  const aVencer = daEmpresa
     .filter(d => d.data >= hojeStr && d.data <= limiteStr)
     .sort((a, b) => a.data.localeCompare(b.data))
   const totalAVencer = aVencer.reduce((s, d) => s + Number(d.valor), 0)
@@ -1444,6 +1468,20 @@ export default function FinanceiroPage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Recorte por empresa. Só aparece com mais de um CNPJ: com um só
+                não há o que escolher, e o campo viraria ruído. */}
+            {empresas.length > 1 && (
+              <select
+                value={empresaFiltro}
+                onChange={e => trocarEmpresa(e.target.value)}
+                title="Filtrar por empresa"
+                className="bg-[#111118] border border-[#2d2d3d] text-sm text-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-600 transition-colors"
+              >
+                <option value="">🏢 Todas as empresas</option>
+                {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              </select>
+            )}
+
             {/* Filtro de mês global — só aparece no dashboard */}
             {aba === 'dashboard' && (
               <select value={mesGlobal} onChange={e => setMesGlobal(e.target.value)}
@@ -1495,9 +1533,9 @@ export default function FinanceiroPage() {
         ) : aba === 'dashboard' ? (
           <DashboardView despesas={despesasDashboard} periodo={mesGlobal} />
         ) : aba === 'projecao' ? (
-          <ProjecaoView despesas={despesas} receitas={receitas} ultimaRenovacao={ultimaRenovacao} />
+          <ProjecaoView despesas={daEmpresa} receitas={receitasDaEmpresa} ultimaRenovacao={ultimaRenovacao} />
         ) : (
-          <DespesasView despesas={despesas} onDelete={handleDelete} onDeleteMany={handleDeleteMany} onEdit={openEditar} onDuplicate={openDuplicar} onVerAnexo={verAnexo} onAdd={openNova} />
+          <DespesasView despesas={daEmpresa} onDelete={handleDelete} onDeleteMany={handleDeleteMany} onEdit={openEditar} onDuplicate={openDuplicar} onVerAnexo={verAnexo} onAdd={openNova} />
         )}
       </div>
 
