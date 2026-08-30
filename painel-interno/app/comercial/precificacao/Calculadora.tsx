@@ -3,7 +3,10 @@
 import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/cn'
-import { Badge, Button, Card, CardHeader, CardBody, Input, Select, Metrica } from '@/components/ui'
+import {
+  Badge, Button, Card, CardHeader, CardBody, Input, Select, Metrica,
+  Tabela, Th, Td, Tr,
+} from '@/components/ui'
 import { toast, confirmar } from '@/components/Feedback'
 import { salvarSimulacao, removerSimulacao, type SimulacaoSalva } from '@/server/precificacao'
 import { calcular, ENTRADAS_PADRAO, CAMPOS, type Entradas } from '@/types/precificacao'
@@ -194,7 +197,7 @@ export function Calculadora({
           <Metrica rotulo="Custo por cliente" valor={brl(r.custoTotalCliente)}
             detalhe={`${brl(r.custoVariavel)} variável + ${brl(r.custoFixoRateado)} rateado`} />
           <Metrica rotulo="Preço mínimo" valor={brl(r.precoMinimo)}
-            detalhe={`Para margem de ${e.margemAlvo}%`} />
+            detalhe={`${e.margemAlvo}% de margem, já com ${e.aliquotaImposto}% de imposto e ${e.taxaFinanceira}% de taxa`} />
           <Metrica rotulo="LTV" valor={r.ltv !== null ? brl(r.ltv) : '—'}
             detalhe={r.vidaMediaMeses !== null ? `${r.vidaMediaMeses.toFixed(1)} meses de vida média` : 'Sem churn informado'} />
           <Metrica rotulo="Equilíbrio" valor={r.breakEvenClientes !== null ? `${r.breakEvenClientes} clientes` : '—'}
@@ -260,6 +263,21 @@ export function Calculadora({
                   <dt className="text-muted">Margem por cliente</dt>
                   <dd className="tabular text-fg">{brl(plano.preco - r.custoVariavel)}</dd>
                 </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted" title="Preço sobre custo, menos um. Confere a margem por outro ângulo.">
+                    Markup
+                  </dt>
+                  <dd className="tabular text-fg">{(r.markup * 100).toFixed(0)}%</dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted">Sobra por cliente</dt>
+                  <dd className="tabular text-fg">
+                    {brl(r.lucroLiquidoCliente)}
+                    <span className="ml-1 text-xs text-subtle">
+                      ({r.margemLiquida.toFixed(0)}%)
+                    </span>
+                  </dd>
+                </div>
               </dl>
               <p className="mt-3 border-t border-line pt-3 text-xs text-subtle">
                 A referência de mercado é LTV pelo menos 3× o CAC e payback abaixo de 12 meses.
@@ -273,6 +291,42 @@ export function Calculadora({
             <CardBody><Projecao dados={r.mrrProjetado} /></CardBody>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader
+            titulo="Lucro conforme o tamanho da base"
+            descricao="O custo fixo não cresce com o cliente — é por isso que a margem melhora com escala."
+          />
+          <CardBody className="p-0">
+            <Tabela>
+              <thead>
+                <tr>
+                  <Th numerica>Clientes</Th>
+                  <Th numerica>Faturamento</Th>
+                  <Th numerica>Custos + imposto + taxa</Th>
+                  <Th numerica>Lucro</Th>
+                  <Th numerica>Margem</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.simulacaoClientes.map(l => (
+                  <Tr key={l.clientes}>
+                    <Td numerica>{l.clientes}</Td>
+                    <Td numerica>{brl(l.faturamento)}</Td>
+                    <Td numerica>{brl(l.custos)}</Td>
+                    <Td numerica>
+                      <span className={l.lucro < 0 ? 'text-crit' : 'text-ok'}>{brl(l.lucro)}</span>
+                    </Td>
+                    <Td numerica>
+                      {l.faturamento > 0 ? `${((l.lucro / l.faturamento) * 100).toFixed(0)}%` : '—'}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Tabela>
+          </CardBody>
+        </Card>
+
       </div>
     </div>
   )
