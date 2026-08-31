@@ -13,6 +13,7 @@ import { AConfirmar } from './AConfirmar'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar, escolher } from '@/components/Feedback'
 import { usePersistido, rangePeriodo, PERIODO_LABEL, foraDaJanela, type PeriodoPreset } from '@/lib/filtros'
+import { previsoesACancelar } from '@/lib/assinatura'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Despesa,
@@ -587,8 +588,8 @@ function ModalDespesa({ open, editing, duplicando, empresas, onClose, onSave, on
                   <div>
                     <p className="text-sm text-red-300 font-medium">Cancelar a partir de qual data?</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Todos os lançamentos desta série <span className="font-medium text-gray-400">a partir do dia escolhido</span> serão
-                      removidos. Os anteriores permanecem como histórico.
+                      As previsões desta série <span className="font-medium text-gray-400">a partir do dia escolhido</span> serão
+                      removidas. O que já foi confirmado como pago fica, em qualquer data.
                     </p>
                   </div>
                   <input type="date" value={cancelData} onChange={e => setCancelData(e.target.value)} className={inp} />
@@ -1415,9 +1416,16 @@ function FinanceiroConteudo() {
   // cutoff (inclusive) e mantém o histórico já lançado. Não regenera nada.
   async function handleCancelarAssinatura(d: Despesa, cutoff: string) {
     if (!d.serie_id) return
+    const alvo = previsoesACancelar(despesas, d.serie_id, cutoff)
     const ok = await confirmar({
       titulo: 'Cancelar assinatura?',
-      mensagem: `Os lançamentos desta série a partir de ${new Date(cutoff + 'T00:00:00').toLocaleDateString('pt-BR')} serão removidos.\nO histórico anterior é mantido. Esta ação não pode ser desfeita.`,
+      mensagem:
+        `${alvo.linhas} previsão(ões) a partir de ${new Date(cutoff + 'T00:00:00').toLocaleDateString('pt-BR')}` +
+        ` serão removidas · ${fmt(alvo.total)}.` +
+        (alvo.protegidas > 0
+          ? `\n${alvo.protegidas} já confirmada(s) como paga(s) nesse intervalo ficam.`
+          : '\nO que já foi confirmado como pago fica, em qualquer data.') +
+        '\nA série para de se renovar. Esta ação não pode ser desfeita.',
       confirmLabel: 'Cancelar assinatura',
       cancelLabel: 'Voltar',
       perigoso: true,
@@ -1430,12 +1438,17 @@ function FinanceiroConteudo() {
       .update({ assinatura_ativa: false })
       .eq('serie_id', d.serie_id)
     if (flagErr) { toast.error(`Erro ao cancelar: ${flagErr.message}`); return }
-    // 2) remove os lançamentos futuros ainda não pagos; mantém o histórico anterior.
+    // 2) apaga exatamente as linhas que a tela contou e mostrou na confirmação,
+    //    por id. Encadear filtros deixaria a decisão para o servidor, e o aviso
+    //    passaria a falar de um conjunto que não é necessariamente o que some.
+    if (alvo.ids.length === 0) {
+      toast.success('Assinatura cancelada · nenhuma previsão futura a remover')
+      closeModal(); fetchDespesas(); return
+    }
     const { data: removidas, error } = await supabase
       .from('despesas')
       .delete()
-      .eq('serie_id', d.serie_id)
-      .gte('data', cutoff)
+      .in('id', alvo.ids)
       .select('id')
     if (error) { toast.error(`Erro ao cancelar: ${error.message}`); return }
     const n = removidas?.length ?? 0
