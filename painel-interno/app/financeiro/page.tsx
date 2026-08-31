@@ -80,9 +80,20 @@ const FATOR_MENSAL: Record<string, number> = {
 // (ou de cada descrição, quando sem série) e converte para o equivalente mensal.
 // Retorna a lista ordenada do maior para o menor custo mensal.
 function recorrentesMensais(despesas: Despesa[]): { nome: string; mensal: number }[] {
+  // Série cancelada tem `assinatura_ativa = false` mas mantém `recorrente =
+  // true` no histórico — a despesa aconteceu, ela só não se repete mais.
+  // Contar as duas coisas como a mesma inflava o run-rate: o Barber Pro seguia
+  // somando R$ 3.000/mês depois de encerrado.
+  const canceladas = new Set(
+    despesas
+      .filter(d => d.serie_id && d.assinatura_ativa === false)
+      .map(d => d.serie_id as string)
+  )
+
   const maisRecente = new Map<string, Despesa>()
   for (const d of despesas) {
     if (!d.recorrente) continue
+    if (d.serie_id && canceladas.has(d.serie_id)) continue
     const chave = d.serie_id ?? `${d.descricao}|${d.periodicidade ?? 'Mensal'}`
     const atual = maisRecente.get(chave)
     if (!atual || d.data > atual.data) maisRecente.set(chave, d)

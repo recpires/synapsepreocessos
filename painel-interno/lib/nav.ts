@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿﻿﻿/**
  * Configuração dos grupos de subnavegação.
  * Cada grupo aparece como uma barra de abas no topo da pagina pai e das filhas.
  */
@@ -32,6 +32,7 @@ export const SUBNAV = {
     { href: '/comercial',               label: 'Pipeline',      icon: '💼' },
     { href: '/comercial/propostas',     label: 'Propostas',     icon: '📨' },
     { href: '/comercial/precificacao',  label: 'Precificação',  icon: '🏷️' },
+    { href: '/comercial/precificacao/servicos', label: 'Serviços', icon: '✂️' },
   ],
   dev: [
     { href: '/dev',    label: 'Desenvolvimento', icon: '⚙️' },
