@@ -320,26 +320,48 @@ export async function listarSemDono(empresaId?: string): Promise<Resultado<
  * é honesto se ela aparecer em algum lugar. Sem esta fila, a mudança
  * esconderia o número em vez de corrigi-lo.
  */
-export async function listarAConfirmar(empresaId?: string): Promise<Resultado<{
-  id: string; data: string; descricao: string; categoria: string; valor: number
-}[]>> {
+export type Pendencia = {
+  id: string
+  data: string
+  descricao: string
+  categoria: string
+  valor: number
+  /** Receita e despesa dividem a fila: as duas são previstas pela recorrência. */
+  tipo: 'despesa' | 'receita'
+}
+
+export async function listarAConfirmar(empresaId?: string): Promise<Resultado<Pendencia[]>> {
   try {
     await assertMembro()
     const sb = await createClient()
-    const { data, error } = await porEmpresa(
-      sb.from('despesas')
-        .select('id, data, descricao, categoria, valor')
-        .lte('data', hojeISO())
-        .eq('confirmado', false)
-        .order('data'),
-      empresaId
-    )
-    if (error) return { error: `a confirmar: ${error.message}` }
-    return {
-      data: (data ?? []).map(d => ({ ...d, valor: Number(d.valor) })) as {
-        id: string; data: string; descricao: string; categoria: string; valor: number
-      }[],
-    }
+
+    const [{ data: desp, error: e1 }, { data: rec, error: e2 }] = await Promise.all([
+      porEmpresa(
+        sb.from('despesas').select('id, data, descricao, categoria, valor')
+          .lte('data', hojeISO()).eq('confirmado', false).order('data'),
+        empresaId
+      ),
+      porEmpresa(
+        sb.from('receitas').select('id, data, descricao, categoria, valor')
+          .lte('data', hojeISO()).eq('confirmado', false).order('data'),
+        empresaId
+      ),
+    ])
+    if (e1) return { error: `despesas a confirmar: ${e1.message}` }
+    if (e2) return { error: `receitas a confirmar: ${e2.message}` }
+
+    const lista: Pendencia[] = [
+      ...(desp ?? []).map(d => ({
+        ...d, valor: Number(d.valor), categoria: d.categoria ?? '—',
+        tipo: 'despesa' as const,
+      })),
+      ...(rec ?? []).map(r => ({
+        ...r, valor: Number(r.valor), categoria: r.categoria ?? 'Mensalidade',
+        tipo: 'receita' as const,
+      })),
+    ].sort((a, b) => a.data.localeCompare(b.data))
+
+    return { data: lista }
   } catch (e) {
     return falha('listarAConfirmar', e)
   }
@@ -353,21 +375,35 @@ export async function listarAConfirmar(empresaId?: string): Promise<Resultado<{
  * resultado.
  */
 export async function resolverPendencias(
-  ids: string[], acao: 'confirmar' | 'apagar'
+  pendencias: { id: string; tipo: 'despesa' | 'receita' }[],
+  acao: 'confirmar' | 'apagar'
 ): Promise<{ ok: boolean; error?: string; linhas?: number }> {
   try {
     await assertMembro()
-    if (ids.length === 0) return { ok: true, linhas: 0 }
+    if (pendencias.length === 0) return { ok: true, linhas: 0 }
     const sb = await createClient()
 
-    const { data, error } = acao === 'confirmar'
-      ? await sb.from('despesas').update({ confirmado: true }).in('id', ids).select('id')
-      : await sb.from('despesas').delete().in('id', ids).select('id')
-    if (error) return { ok: false, error: error.message }
+    // Despesa e receita moram em tabelas diferentes; a fila é uma só. Separar
+    // aqui evita a tela ter de saber disso.
+    const porTabela = {
+      despesas: pendencias.filter(p => p.tipo === 'despesa').map(p => p.id),
+      receitas: pendencias.filter(p => p.tipo === 'receita').map(p => p.id),
+    }
+
+    let linhas = 0
+    for (const [tabela, ids] of Object.entries(porTabela)) {
+      if (ids.length === 0) continue
+      const { data, error } = acao === 'confirmar'
+        ? await sb.from(tabela).update({ confirmado: true }).in('id', ids).select('id')
+        : await sb.from(tabela).delete().in('id', ids).select('id')
+      if (error) return { ok: false, error: `${tabela}: ${error.message}` }
+      linhas += (data ?? []).length
+    }
 
     revalidatePath('/financeiro')
+    revalidatePath('/receitas')
     revalidatePath('/overview')
-    return { ok: true, linhas: (data ?? []).length }
+    return { ok: true, linhas }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }

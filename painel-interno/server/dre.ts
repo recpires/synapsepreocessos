@@ -52,8 +52,10 @@ export async function montarDRE(
 
     const [{ data: receitas, error: e1 }, { data: despesas, error: e2 }, { data: impostos }] =
       await Promise.all([
+        // Receita prevista pela recorrência não é receita recebida: só entra
+        // no demonstrativo depois de alguém confirmar que o dinheiro caiu.
         porEmpresa(sb.from('receitas').select('valor, tipo, categoria, status')
-          .gte('data', inicio).lt('data', corte), empresaId),
+          .gte('data', inicio).lt('data', corte).eq('confirmado', true), empresaId),
         // Só o confirmado entra no demonstrativo: a recorrência gera a linha
         // futura, e ela não vira fato só porque a data passou.
         porEmpresa(sb.from('despesas').select('valor, categoria')

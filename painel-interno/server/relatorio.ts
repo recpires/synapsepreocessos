@@ -98,7 +98,8 @@ export async function montarRelatorio(
       porEmpresa(sb.from('despesas')
         .select('data, descricao, categoria, valor, recorrente, periodicidade, produto')
         .gte('data', inicio).lt('data', fim).order('valor', { ascending: false }), empresaId),
-      porEmpresa(sb.from('receitas').select('valor').gte('data', inicio).lt('data', fim)
+      porEmpresa(sb.from('receitas').select('valor').eq('confirmado', true)
+        .gte('data', inicio).lt('data', fim)
         .in('status', ['recebido', 'confirmado']), empresaId),
       porEmpresa(sb.from('despesas').select('categoria, valor')
         .gte('data', antInicio).lt('data', antFim), empresaId),

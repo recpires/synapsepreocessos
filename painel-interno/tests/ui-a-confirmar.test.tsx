@@ -17,9 +17,9 @@ const chamadas: { ids: string[]; acao: string }[] = []
 
 mock.module('@/server/financeiro', {
   namedExports: {
-    resolverPendencias: async (ids: string[], acao: string) => {
-      chamadas.push({ ids, acao })
-      return { ok: true, linhas: ids.length }
+    resolverPendencias: async (itens: { id: string; tipo: string }[], acao: string) => {
+      chamadas.push({ ids: itens.map(i => i.id), acao })
+      return { ok: true, linhas: itens.length }
     },
   },
 })
@@ -39,7 +39,8 @@ mock.module('@/components/Feedback', {
 // Carregado depois dos mocks e sem `await` no topo: o loader compila para CJS,
 // onde top-level await não existe.
 type Pendencia = {
-  id: string; data: string; descricao: string; categoria: string; valor: number
+  id: string; data: string; descricao: string; categoria: string
+  valor: number; tipo: 'despesa' | 'receita'
 }
 let AConfirmar: (p: { pendencias: Pendencia[] }) => React.ReactElement | null
 
@@ -47,10 +48,10 @@ before(async () => {
   ;({ AConfirmar } = await import('../app/financeiro/AConfirmar.tsx'))
 })
 
-const PENDENCIAS = [
-  { id: 'a', data: '2026-08-01', descricao: 'Supabase', categoria: 'Infraestrutura', valor: 100 },
-  { id: 'b', data: '2026-08-05', descricao: 'ManyChat', categoria: 'Ferramentas', valor: 200 },
-  { id: 'c', data: '2026-08-10', descricao: 'Google Ads', categoria: 'Marketing', valor: 300 },
+const PENDENCIAS: Pendencia[] = [
+  { id: 'a', data: '2026-08-01', descricao: 'Supabase', categoria: 'Infraestrutura', valor: 100, tipo: 'despesa' },
+  { id: 'b', data: '2026-08-05', descricao: 'ManyChat', categoria: 'Ferramentas', valor: 200, tipo: 'despesa' },
+  { id: 'c', data: '2026-08-10', descricao: 'Mensalidade Nero', categoria: 'Mensalidade', valor: 300, tipo: 'receita' },
 ]
 
 describe('AConfirmar', () => {
@@ -63,8 +64,11 @@ describe('AConfirmar', () => {
 
   test('mostra a contagem e o total', () => {
     render(<AConfirmar pendencias={PENDENCIAS} />)
-    assert.match(screen.getByText(/venceram sem confirmação/).textContent!, /3 previsão/)
-    assert.match(screen.getByText(/venceram sem confirmação/).textContent!, /600,00/)
+    const cabecalho = screen.getByText(/venceram sem confirmação/).textContent!
+    assert.match(cabecalho, /3 previsão/)
+    // Saída e entrada somam separado: R$ 300 a pagar e R$ 300 a receber.
+    assert.match(cabecalho, /300,00 a pagar/)
+    assert.match(cabecalho, /300,00 a receber/)
   })
 
   test('sem nada marcado, confirma todas', async () => {
@@ -105,7 +109,7 @@ describe('AConfirmar', () => {
   test('lista longa é truncada mas a ação continua valendo para tudo', async () => {
     const muitas = Array.from({ length: 20 }, (_, i) => ({
       id: `x${i}`, data: '2026-08-01', descricao: `Item ${i}`,
-      categoria: 'Outros', valor: 10,
+      categoria: 'Outros', valor: 10, tipo: 'despesa' as const,
     }))
     render(<AConfirmar pendencias={muitas} />)
     assert.equal(screen.getAllByRole('checkbox').length, 12)

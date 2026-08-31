@@ -8,7 +8,7 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, Legend,
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
-import { listarAConfirmar } from '@/server/financeiro'
+import { listarAConfirmar, type Pendencia } from '@/server/financeiro'
 import { AConfirmar } from './AConfirmar'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar, escolher } from '@/components/Feedback'
@@ -1239,9 +1239,7 @@ function FinanceiroConteudo() {
 
   const [despesas, setDespesas]   = useState<Despesa[]>([])
   const [empresas, setEmpresas]   = useState<{ id: string; nome: string }[]>([])
-  const [pendencias, setPendencias] = useState<
-    { id: string; data: string; descricao: string; categoria: string; valor: number }[]
-  >([])
+  const [pendencias, setPendencias] = useState<Pendencia[]>([])
   const [receitas, setReceitas]   = useState<Receita[]>([])
   const [ultimaRenovacao, setUltimaRenovacao] = useState<string | null>(null)
   const [loading, setLoading]     = useState(true)
