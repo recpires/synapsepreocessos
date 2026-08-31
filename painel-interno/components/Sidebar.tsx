@@ -25,6 +25,17 @@ const NAV = [
   { href: '/time',       icon: '👥', label: 'Time' },
   { href: '/processos',  icon: '📋', label: 'Processos' },
   { href: '/conhecimento', icon: '📚', label: 'Conhecimento' },
+]
+
+/**
+ * Telas de acompanhamento, fixadas no rodapé do menu.
+ *
+ * Ficavam no fim da lista rolável, e com dezessete itens as três últimas caíam
+ * abaixo do campo de visão — o log de auditoria, que é justamente o que se
+ * procura quando algo deu errado, era o mais escondido de todos. Aqui elas não
+ * dependem de alguém descobrir que o menu rola.
+ */
+const NAV_ACOMPANHAR: typeof NAV = [
   { href: '/vencimentos', icon: '⏰', label: 'Vencimentos' },
   { href: '/resumos', icon: '🗞️', label: 'Resumo semanal' },
   { href: '/config/atividades', icon: '🕘', label: 'Atividades' },
@@ -64,6 +75,31 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
 
   // No mobile (drawer aberto) ignora o "collapsed" — sempre expandido
   const showCollapsed = collapsed && !open
+
+  /** Um item de menu. Os dois grupos rendem igual; só o lugar muda. */
+  const item2link = (item: { href: string; icon: string; label: string }) => {
+    const filhas = NAV_GRUPOS[item.href] ?? []
+    const active = pathname === item.href
+      || filhas.some(f => pathname === f || pathname.startsWith(f + '/'))
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onClose}
+        title={showCollapsed ? item.label : undefined}
+        className={`flex items-center rounded-lg text-sm transition-colors ${
+          showCollapsed ? 'md:justify-center md:px-0 md:py-2.5 gap-2.5 px-3 py-2.5' : 'gap-2.5 px-3 py-2.5'
+        } ${
+          active
+            ? 'bg-accent-soft text-accent-text font-medium'
+            : 'text-muted hover:text-fg hover:bg-surface-2'
+        }`}
+      >
+        <span className="text-base leading-none flex-shrink-0">{item.icon}</span>
+        <span className={showCollapsed ? 'md:hidden' : ''}>{item.label}</span>
+      </Link>
+    )
+  }
 
   return (
     <aside
@@ -109,29 +145,13 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
 
       {/* Nav */}
       <nav className={`flex-1 ${showCollapsed ? 'md:px-1.5' : 'px-2'} py-3 space-y-0.5 overflow-y-auto`}>
-        {NAV.map(item => {
-          const filhas = NAV_GRUPOS[item.href] ?? []
-          const active = pathname === item.href || filhas.some(f => pathname === f || pathname.startsWith(f + '/'))
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              title={showCollapsed ? item.label : undefined}
-              className={`flex items-center rounded-lg text-sm transition-colors ${
-                showCollapsed ? 'md:justify-center md:px-0 md:py-2.5 gap-2.5 px-3 py-2.5' : 'gap-2.5 px-3 py-2.5'
-              } ${
-                active
-                  ? 'bg-accent-soft text-accent-text font-medium'
-                  : 'text-muted hover:text-fg hover:bg-surface-2'
-              }`}
-            >
-              <span className="text-base leading-none flex-shrink-0">{item.icon}</span>
-              <span className={showCollapsed ? 'md:hidden' : ''}>{item.label}</span>
-            </Link>
-          )
-        })}
+        {NAV.map(item => item2link(item))}
       </nav>
+
+      {/* Acompanhamento — fixo, para não depender de rolar o menu */}
+      <div className={`border-t border-line ${showCollapsed ? 'md:px-1.5' : 'px-2'} py-2 space-y-0.5`}>
+        {NAV_ACOMPANHAR.map(item => item2link(item))}
+      </div>
 
       {/* Toggle collapse — só desktop */}
       {onToggleCollapsed && (
