@@ -67,3 +67,31 @@ export function rangePeriodo(
     default:            return { de: '1900-01-01', ate: '2999-12-31' }
   }
 }
+
+/**
+ * O que a janela de datas está escondendo.
+ *
+ * O filtro padrão é "Este ano", e nada na tela dizia que existia lançamento
+ * fora dele. Três séries do Supabase viviam inteiras em 2027 — R$ 869,11 por
+ * mês de projeção duplicada, invisíveis para quem foi procurar duplicata na
+ * tela de despesas. Quem olhou concluiu que estava limpo, e estava certo sobre
+ * o que via.
+ *
+ * Só conta o recorte de data. Categoria, tipo e busca também escondem linha,
+ * mas ali quem filtrou sabe o que pediu; a janela temporal é a que vem ligada
+ * por padrão.
+ */
+export function foraDaJanela(
+  linhas: { data: string; valor: number | string }[],
+  de: string,
+  ate: string,
+): { antes: number; depois: number; total: number } {
+  let antes = 0, depois = 0, total = 0
+  for (const l of linhas) {
+    if (l.data >= de && l.data <= ate) continue
+    if (l.data < de) antes++
+    else depois++
+    total += Number(l.valor) || 0
+  }
+  return { antes, depois, total }
+}

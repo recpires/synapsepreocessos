@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { statusAsaas } from '@/server/integracoes'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar, escolher } from '@/components/Feedback'
-import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
+import { usePersistido, rangePeriodo, PERIODO_LABEL, foraDaJanela, type PeriodoPreset } from '@/lib/filtros'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Receita,
@@ -562,6 +562,9 @@ function ReceitasConteudo() {
     return matchEmpresa && matchPeriodo && matchBusca && matchProduto && matchOrigem && matchStatus && matchCat
   })
   const filtroAtivo = f.preset !== 'ano-atual' || f.busca || f.produto !== 'Todos' || f.origem !== 'Todos' || f.status !== 'Todos' || f.categoria !== 'Todas'
+  // A janela some com previsão de ano seguinte sem avisar. Ver lib/filtros.
+  const escondido = foraDaJanela(
+    empresaFiltro ? receitas.filter(r => r.empresa_id === empresaFiltro) : receitas, de, ate)
 
   const ordenadas = [...filtradas].sort((a, b) => {
     const va = valorOrdenacaoReceita(a, sort.campo)
@@ -725,6 +728,22 @@ function ReceitasConteudo() {
             {filtradas.length} receita{filtradas.length !== 1 ? 's' : ''}
           </div>
         </div>
+
+        {escondido.antes + escondido.depois > 0 && (
+          <button
+            type="button"
+            onClick={() => upd({ preset: 'tudo' })}
+            className="flex w-full items-center gap-2 rounded-lg border border-[#2d2d3d] bg-[#111118] px-4 py-2 text-left text-xs text-gray-500 transition-colors hover:border-violet-700 hover:text-gray-300"
+          >
+            <span>👁️</span>
+            <span>
+              {escondido.antes + escondido.depois} receita(s) fora deste período
+              {escondido.depois > 0 && <> · {escondido.depois} depois de {ate.split('-').reverse().join('/')}</>}
+              {' · '}{fmt(escondido.total)}
+            </span>
+            <span className="ml-auto text-violet-400">ver todas</span>
+          </button>
+        )}
 
         {/* Barra de ação em massa */}
         {selecionados.size > 0 && (

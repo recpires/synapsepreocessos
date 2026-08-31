@@ -12,7 +12,7 @@ import { listarAConfirmar, type Pendencia } from '@/server/financeiro'
 import { AConfirmar } from './AConfirmar'
 import SubNav from '@/components/SubNav'
 import { toast, confirmar, escolher } from '@/components/Feedback'
-import { usePersistido, rangePeriodo, PERIODO_LABEL, type PeriodoPreset } from '@/lib/filtros'
+import { usePersistido, rangePeriodo, PERIODO_LABEL, foraDaJanela, type PeriodoPreset } from '@/lib/filtros'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Despesa,
@@ -882,6 +882,7 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
 
   const totalFiltrado = filtradas.reduce((s, d) => s + Number(d.valor), 0)
   const filtroAtivo = f.preset !== 'ano-atual' || f.categoria !== 'Todas' || f.tipo !== 'todos' || f.produto !== 'Todos' || !!f.busca
+  const escondido = foraDaJanela(despesas, de, ate)
 
   const toggleUm = (id: string) => setSelecionados(prev => {
     const next = new Set(prev)
@@ -950,6 +951,22 @@ function DespesasView({ despesas, onDelete, onDeleteMany, onEdit, onDuplicate, o
           </button>
         </div>
       </div>
+
+      {escondido.antes + escondido.depois > 0 && (
+        <button
+          type="button"
+          onClick={() => upd({ preset: 'tudo' })}
+          className="flex w-full items-center gap-2 rounded-lg border border-[#2d2d3d] bg-[#111118] px-4 py-2 text-left text-xs text-gray-500 transition-colors hover:border-violet-700 hover:text-gray-300"
+        >
+          <span>👁️</span>
+          <span>
+            {escondido.antes + escondido.depois} lançamento(s) fora deste período
+            {escondido.depois > 0 && <> · {escondido.depois} depois de {ate.split('-').reverse().join('/')}</>}
+            {' · '}{fmt(escondido.total)}
+          </span>
+          <span className="ml-auto text-violet-400">ver todos</span>
+        </button>
+      )}
 
       {/* Barra de ação em massa */}
       {selecionados.size > 0 && (
