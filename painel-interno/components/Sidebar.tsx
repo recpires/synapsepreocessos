@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TemaToggle } from '@/components/ui'
 import { BuscaGlobal } from '@/components/BuscaGlobal'
+import { ehDonoDaCentral } from '@/lib/central-acesso'
 
 const NAV = [
   { href: '/overview',   icon: '🏠', label: 'Visão Geral' },
@@ -40,6 +41,9 @@ const NAV_ACOMPANHAR: typeof NAV = [
   { href: '/resumos', icon: '🗞️', label: 'Resumo semanal' },
   { href: '/config/atividades', icon: '🕘', label: 'Atividades' },
 ]
+
+/** Agenda e roadmap pessoais — só o dono enxerga. */
+const NAV_CENTRAL = { href: '/central', icon: '🎯', label: 'Central' }
 
 // Grupos: rotas filhas que destacam a aba pai no sidebar
 const NAV_GRUPOS: Record<string, string[]> = {
@@ -150,6 +154,9 @@ export default function Sidebar({ open = false, onClose, collapsed = false, onTo
 
       {/* Acompanhamento — fixo, para não depender de rolar o menu */}
       <div className={`border-t border-line ${showCollapsed ? 'md:px-1.5' : 'px-2'} py-2 space-y-0.5`}>
+        {/* Área pessoal do dono. Esconder o link é só arrumação: a rota
+            devolve 404 para os outros e a RLS não entrega a linha. */}
+        {ehDonoDaCentral(email) && item2link(NAV_CENTRAL)}
         {NAV_ACOMPANHAR.map(item => item2link(item))}
       </div>
 
