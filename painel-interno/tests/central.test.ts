@@ -22,6 +22,7 @@ const t = (over: Partial<Tarefa> = {}): Tarefa => ({
   data: '2026-09-03',
   hora: null,
   feito: false,
+  nota: '',
   ...over,
 })
 

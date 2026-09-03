@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { PageHeader, Card, CardBody, Erro, Vazio, Button, Input, Select } from '@/components/ui'
+import { PageHeader, Card, CardBody, Erro, Vazio, Button, Input, Select, Textarea } from '@/components/ui'
 import { toast, confirmar } from '@/components/Feedback'
 import {
   FRENTES, FRENTE_LABEL, FRENTE_COR, STATUS, STATUS_LABEL, STATUS_COR,
@@ -10,7 +10,7 @@ import {
   type Frente, type ItemRoadmap, type StatusItem, type Tarefa,
 } from '@/types/central'
 import {
-  listarTarefas, criarTarefa, alternarTarefa, apagarTarefa,
+  listarTarefas, criarTarefa, alternarTarefa, apagarTarefa, salvarNota,
   listarRoadmap, criarItemRoadmap, atualizarItemRoadmap, apagarItemRoadmap, semearRoadmap,
 } from '@/server/central'
 import { ROADMAP_INICIAL } from './roadmap-inicial'
@@ -154,6 +154,13 @@ function Caixa({ feito, onClick }: { feito: boolean; onClick: () => void }) {
 function LinhaTarefa({
   t, executar, compacta = false,
 }: { t: Tarefa; executar: Executar; compacta?: boolean }) {
+  const [anotando, setAnotando] = useState(false)
+  const [nota, setNota] = useState(t.nota)
+
+  // A nota pode chegar de outra aba ou de outro aparelho; enquanto o textarea
+  // está aberto o que vale é o que está sendo digitado.
+  useEffect(() => { if (!anotando) setNota(t.nota) }, [t.nota, anotando])
+
   const remover = async () => {
     const ok = await confirmar({
       titulo: 'Apagar esta tarefa?',
@@ -164,32 +171,76 @@ function LinhaTarefa({
     if (ok) executar(() => apagarTarefa(t.id))
   }
 
+  const gravar = () => {
+    executar(() => salvarNota(t.id, nota), 'Anotação salva.')
+    setAnotando(false)
+  }
+
   return (
     <div
-      className={`flex items-start gap-2.5 rounded-token border border-line bg-surface px-3 py-2.5 ${
-        t.feito ? 'opacity-50' : ''
+      className={`rounded-token border border-line bg-surface px-3 py-2.5 ${
+        // Feita com anotação não desbota: a nota é justamente o que se quer ler
+        // depois, e opacidade de 50% em texto pequeno some.
+        t.feito && !t.nota ? 'opacity-50' : ''
       }`}
       style={compacta ? { borderLeft: `3px solid ${FRENTE_COR[t.frente]}` } : undefined}
     >
-      <Caixa feito={t.feito} onClick={() => executar(() => alternarTarefa(t.id, !t.feito))} />
-      <div className="min-w-0 flex-1">
-        <p className={`text-sm ${t.feito ? 'line-through text-muted' : 'text-fg'}`}>{t.titulo}</p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          {!compacta && <EtiquetaFrente frente={t.frente} />}
-          <span className="rounded border border-line px-1.5 py-px text-[10px] text-subtle">
-            {t.tipo === 'reuniao' ? 'Reunião' : 'Tarefa'}
-          </span>
-          {t.hora && <span className="tabular text-[11px] text-subtle">{t.hora}</span>}
+      <div className="flex items-start gap-2.5">
+        <Caixa feito={t.feito} onClick={() => executar(() => alternarTarefa(t.id, !t.feito))} />
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm ${t.feito ? 'line-through text-muted' : 'text-fg'}`}>{t.titulo}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {!compacta && <EtiquetaFrente frente={t.frente} />}
+            <span className="rounded border border-line px-1.5 py-px text-[10px] text-subtle">
+              {t.tipo === 'reuniao' ? 'Reunião' : 'Tarefa'}
+            </span>
+            {t.hora && <span className="tabular text-[11px] text-subtle">{t.hora}</span>}
+            {!anotando && (
+              <button
+                type="button"
+                onClick={() => setAnotando(true)}
+                className="text-[11px] text-subtle underline-offset-2 transition-colors hover:text-accent hover:underline"
+              >
+                {t.nota ? 'editar anotação' : '+ anotar o que foi feito'}
+              </button>
+            )}
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={remover}
+          aria-label="Apagar"
+          className="flex-shrink-0 px-1 text-subtle transition-colors hover:text-crit"
+        >
+          ×
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={remover}
-        aria-label="Apagar"
-        className="flex-shrink-0 px-1 text-subtle transition-colors hover:text-crit"
-      >
-        ×
-      </button>
+
+      {anotando ? (
+        <div className="mt-2 space-y-2 pl-[28px]">
+          <Textarea
+            value={nota}
+            onChange={e => setNota(e.target.value)}
+            onKeyDown={e => {
+              // Enter quebra linha; salvar exige gesto explícito ou Ctrl+Enter.
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) gravar()
+              if (e.key === 'Escape') { setNota(t.nota); setAnotando(false) }
+            }}
+            rows={3}
+            autoFocus
+            placeholder="O que foi feito, o que travou, o que ficou para depois…"
+          />
+          <div className="flex gap-2">
+            <Button tamanho="sm" onClick={gravar}>Salvar anotação</Button>
+            <Button tamanho="sm" variante="fantasma"
+              onClick={() => { setNota(t.nota); setAnotando(false) }}>Cancelar</Button>
+          </div>
+        </div>
+      ) : t.nota ? (
+        <p className="mt-1.5 whitespace-pre-wrap border-l-2 border-line pl-2.5 text-[13px] leading-relaxed text-muted ml-[28px]">
+          {t.nota}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -203,15 +254,19 @@ function FormTarefa({
   const [tipo, setTipo] = useState('tarefa')
   const [data, setData] = useState(() => somarDias(hojeISO(), 1))
   const [hora, setHora] = useState('')
+  const [nota, setNota] = useState('')
+  const [comNota, setComNota] = useState(false)
 
   const enviar = () => {
     if (!titulo.trim()) { toast.error('Escreva o que precisa ser feito.'); return }
     executar(
-      () => criarTarefa({ titulo, frente, tipo, data: dataFixa ?? data, hora: hora || null }),
+      () => criarTarefa({ titulo, frente, tipo, data: dataFixa ?? data, hora: hora || null, nota }),
       'Adicionado.'
     )
     setTitulo('')
     setHora('')
+    setNota('')
+    setComNota(false)
   }
 
   return (
@@ -242,6 +297,26 @@ function FormTarefa({
             dica="Sem hora, fica no bloco do dia"
           />
         </div>
+        {/* Fechada por padrão: no cadastro a anotação é exceção — o comum é
+            escrever depois, na própria tarefa, quando já se sabe o que rolou. */}
+        {comNota ? (
+          <Textarea
+            value={nota}
+            onChange={e => setNota(e.target.value)}
+            rows={3}
+            autoFocus
+            rotulo="Anotação"
+            placeholder="Contexto, link, o que precisa levar…"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setComNota(true)}
+            className="text-[12px] text-subtle underline-offset-2 transition-colors hover:text-accent hover:underline"
+          >
+            + anotação
+          </button>
+        )}
         <Button onClick={enviar} carregando={salvando} className="w-full">
           Adicionar
         </Button>

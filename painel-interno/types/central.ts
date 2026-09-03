@@ -52,6 +52,14 @@ export type Tarefa = {
   /** `null` = tarefa do dia, não do relógio. Fica fora da linha do tempo. */
   hora: string | null
   feito: boolean
+  /**
+   * O que foi feito.
+   *
+   * O título é a intenção; isto é o registro. É o que responde, uma semana
+   * depois, para onde a terça-feira foi — uma caixinha marcada, sozinha, não
+   * responde nada.
+   */
+  nota: string
 }
 
 export type ItemRoadmap = {

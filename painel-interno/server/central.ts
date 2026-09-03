@@ -37,7 +37,7 @@ export async function listarTarefas(): Promise<Resultado<Tarefa[]>> {
     desde.setDate(desde.getDate() - DIAS_PARA_TRAS)
     const { data, error } = await sb
       .from('agenda_tarefas')
-      .select('id, titulo, frente, tipo, data, hora, feito')
+      .select('id, titulo, frente, tipo, data, hora, feito, nota')
       .gte('data', desde.toISOString().slice(0, 10))
       .order('data')
       .order('hora', { nullsFirst: false })
@@ -60,6 +60,7 @@ export async function criarTarefa(entrada: {
   tipo: string
   data: string
   hora?: string | null
+  nota?: string
 }): Promise<Ok> {
   try {
     const membro = await assertMembro()
@@ -77,6 +78,7 @@ export async function criarTarefa(entrada: {
       tipo,
       data: entrada.data,
       hora: entrada.hora || null,
+      nota: (entrada.nota ?? '').trim(),
     })
     if (error) throw error
     revalidatePath('/central')
@@ -96,6 +98,26 @@ export async function alternarTarefa(id: string, feito: boolean): Promise<Ok> {
     return { ok: true }
   } catch (e) {
     return { ok: false, ...falha('Não foi possível marcar', e) } as Ok
+  }
+}
+
+/**
+ * A anotação do que foi feito.
+ *
+ * Separada de `criarTarefa` porque o momento é outro: o título se escreve
+ * antes, isto se escreve depois. Salvar a nota não mexe em `feito` — anotar
+ * o andamento de algo que continua aberto é caso comum.
+ */
+export async function salvarNota(id: string, nota: string): Promise<Ok> {
+  try {
+    await assertMembro()
+    const sb = await createClient()
+    const { error } = await sb.from('agenda_tarefas').update({ nota: nota.trim() }).eq('id', id)
+    if (error) throw error
+    revalidatePath('/central')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, ...falha('Não foi possível salvar a anotação', e) } as Ok
   }
 }
 
