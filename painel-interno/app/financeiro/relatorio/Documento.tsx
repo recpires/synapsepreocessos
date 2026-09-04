@@ -355,7 +355,7 @@ export function Documento({
         {/* ── Maiores lançamentos ──
             Só quando o anexo é longo demais para servir de destaque: num mês
             de quinze linhas, o "dez maiores" repete a lista inteira. */}
-        {r.lancamentos.length > 14 && (
+        {r.lancamentos.length > 30 && (
         <section className="mb-8">
           <h2 className="mb-3 border-b border-line pb-1 text-xs font-bold uppercase tracking-wide text-subtle">
             Dez maiores lançamentos
@@ -437,12 +437,12 @@ export function Documento({
           </section>
         )}
 
+        {/* A assinatura fica só no rodapé repetido; aqui ela duplicaria na
+            última folha, que é onde os dois se encontram. */}
         <footer className="border-t border-line pt-4 text-[11px] leading-relaxed text-subtle">
-          <div className="font-medium text-muted">{assinatura}</div>
-          <div>
-            Emitido em {emitidoEm} pelo Painel Interno da Synapse Code, a partir dos
-            lançamentos registrados até a data. Valores em reais (BRL).
-          </div>
+          <span className="font-medium text-muted print:hidden">{assinatura} · </span>
+          Emitido em {emitidoEm} pelo Painel Interno da Synapse Code, a partir dos
+          lançamentos registrados até a data. Valores em reais (BRL).
         </footer>
 
         {/* Repetido em toda página impressa: uma folha solta do meio do
@@ -459,19 +459,43 @@ export function Documento({
         @media print {
           @page { size: A4; margin: 16mm 14mm 18mm; }
           html, body { background: #fff !important; }
-          /* Impressão sempre no tema claro: fundo escuro come tinta e some no papel. */
+          /*
+           * Impressão sempre no tema claro: fundo escuro come tinta e some no
+           * papel.
+           *
+           * O !important não é preguiça. O tema escuro é aplicado por
+           * :root[data-theme='dark'] e :root:not([data-theme='light']), ambos
+           * com especificidade 0,2,0; a media query de impressão não
+           * acrescenta especificidade nenhuma, então um :root puro (0,1,0)
+           * perdia a disputa e as cores do escuro sobreviviam à impressão. O
+           * fundo virava branco — essa regra é html, body e vencia — mas o
+           * texto continuava claro. O relatório saía apagado no papel, e na
+           * tela nada denunciava isso.
+           */
           :root {
-            --ground: 255 255 255;
-            --surface: 255 255 255;
-            --surface-2: 245 245 248;
-            --surface-3: 235 235 240;
-            --line: 220 220 228;
-            --line-strong: 190 190 200;
-            --fg: 17 17 20;
-            --fg-muted: 70 70 85;
-            --fg-subtle: 110 110 125;
-            --accent: 91 33 182;
+            --ground: 255 255 255 !important;
+            --surface: 255 255 255 !important;
+            --surface-2: 245 245 248 !important;
+            --surface-3: 235 235 240 !important;
+            --line: 220 220 228 !important;
+            --line-strong: 190 190 200 !important;
+            --fg: 17 17 20 !important;
+            --fg-muted: 70 70 85 !important;
+            --fg-subtle: 100 100 115 !important;
+            --accent: 91 33 182 !important;
+            --accent-text: 76 29 149 !important;
+            --accent-soft: 237 233 254 !important;
+            --ok: 21 128 61 !important;
+            --warn: 146 64 14 !important;
+            --warn-soft: 254 249 231 !important;
+            --warn-line: 217 180 90 !important;
+            --crit: 185 28 28 !important;
+            --crit-soft: 254 242 242 !important;
+            --crit-line: 220 150 150 !important;
           }
+          /* O navegador descarta fundo e cor de fundo por padrão ao imprimir;
+             sem isto as barras do gráfico e a rosca saem em branco. */
+          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           section { break-inside: auto; }
           table { break-inside: auto; }
           tr { break-inside: avoid; }
