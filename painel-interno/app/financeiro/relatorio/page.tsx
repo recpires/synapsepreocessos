@@ -39,6 +39,18 @@ export default async function RelatorioPage({
   const emp = proprias.find(e => e.id === sp.empresa)
   const escopo = emp?.nome ?? null
 
+  // Um relatório financeiro que sai da empresa precisa dizer qual é a
+  // entidade: nome de fantasia não identifica ninguém num processo ou numa
+  // prestação de contas. No consolidado não há um CNPJ único a declarar.
+  const dados = (empresas.data ?? []).find(e => e.id === sp.empresa)
+  const identificacao = dados
+    ? {
+        razaoSocial: dados.razao_social,
+        cnpj: dados.cnpj ?? null,
+        regime: dados.regime_tributario ?? null,
+      }
+    : null
+
   if (!relatorio.data) {
     return (
       <div className="min-h-screen bg-ground p-6">
@@ -54,6 +66,7 @@ export default async function RelatorioPage({
       mes={mesDoPeriodo({ inicio, fim })}
       ano={agora.getFullYear()}
       empresas={proprias}
+      identificacao={identificacao}
     />
   )
 }

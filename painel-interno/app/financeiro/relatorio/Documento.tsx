@@ -13,43 +13,74 @@ const pct = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : ''}${v.
 
 const MES_CURTO = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
+/** O banco guarda a chave; o documento mostra o nome do regime. */
+const REGIME_LABEL: Record<string, string> = {
+  mei: 'MEI',
+  simples: 'Simples Nacional',
+  presumido: 'Lucro Presumido',
+  real: 'Lucro Real',
+}
+
 function rotuloMes(iso: string) {
   const [, m] = iso.split('-').map(Number)
   return MES_CURTO[m - 1]
 }
 
-/** Barras mensais em SVG: o recharts não imprime de forma confiável. */
+/**
+ * Doze meses em barras, com o período em destaque.
+ *
+ * SVG e não recharts: biblioteca de gráfico não imprime de forma confiável.
+ * Os meses fora do período ficam esmaecidos — são contexto, e a tendência é
+ * o que dá sentido ao número do mês.
+ */
 function Grafico({ serie }: { serie: Relatorio['serie'] }) {
   if (serie.length === 0) return null
 
   const maximo = Math.max(...serie.map(s => s.realizado + s.projetado), 1)
   const largura = 680
-  const altura = 180
-  const base = altura - 26
+  const altura = 190
+  const base = altura - 34
   const passo = largura / serie.length
-  const barra = Math.min(passo * 0.6, 44)
+  const barra = Math.min(passo * 0.58, 40)
+  const brlCurto = (v: number) =>
+    v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(v))
 
   return (
     <svg viewBox={`0 0 ${largura} ${altura}`} className="w-full" role="img"
-      aria-label="Despesa por mês no período">
+      aria-label="Despesa mensal nos últimos doze meses">
       {[0, 0.25, 0.5, 0.75, 1].map(f => (
         <line key={f} x1="0" x2={largura} y1={base - base * f} y2={base - base * f}
-          stroke="currentColor" opacity="0.12" strokeWidth="1" />
+          stroke="currentColor" opacity={f === 0 ? 0.35 : 0.1} strokeWidth="1" />
       ))}
       {serie.map((s, i) => {
         const x = i * passo + (passo - barra) / 2
         const hR = (s.realizado / maximo) * base
         const hP = (s.projetado / maximo) * base
+        const total = s.realizado + s.projetado
         return (
           <g key={s.mes}>
             {hP > 0 && (
               <rect x={x} y={base - hR - hP} width={barra} height={hP}
-                className="fill-accent" opacity="0.3" />
+                className="fill-accent" opacity={s.noPeriodo ? 0.35 : 0.15} />
             )}
-            <rect x={x} y={base - hR} width={barra} height={hR} className="fill-accent" />
-            <text x={x + barra / 2} y={altura - 8} textAnchor="middle"
-              className="fill-current text-[10px]" opacity="0.6">
+            <rect x={x} y={base - hR} width={barra} height={hR}
+              className="fill-accent" opacity={s.noPeriodo ? 1 : 0.28} />
+            {/* Valor só no período: em doze barras, tudo rotulado vira ruído. */}
+            {s.noPeriodo && total > 0 && (
+              <text x={x + barra / 2} y={base - hR - hP - 5} textAnchor="middle"
+                className="fill-current text-[9px] font-semibold">
+                {brlCurto(total)}
+              </text>
+            )}
+            <text x={x + barra / 2} y={altura - 16} textAnchor="middle"
+              className="fill-current text-[9px]"
+              opacity={s.noPeriodo ? 0.9 : 0.45}
+              style={s.noPeriodo ? { fontWeight: 600 } : undefined}>
               {rotuloMes(s.mes)}
+            </text>
+            <text x={x + barra / 2} y={altura - 5} textAnchor="middle"
+              className="fill-current text-[8px]" opacity="0.35">
+              {s.mes.slice(2, 4)}
             </text>
           </g>
         )
@@ -58,8 +89,80 @@ function Grafico({ serie }: { serie: Relatorio['serie'] }) {
   )
 }
 
+/**
+ * Composição da despesa, em rosca.
+ *
+ * Tons de uma cor só, do maior para o menor, em vez de fatias multicoloridas:
+ * a gradação carrega a ordem de grandeza sozinha e sobrevive à impressão em
+ * preto e branco, que é como metade dos relatórios acaba sendo lida. Paleta
+ * arbitrária obrigaria a consultar a legenda a cada fatia.
+ *
+ * Acima de seis categorias o resto vira "Outras": fatia de 2% não é
+ * informação, é sujeira na borda.
+ */
+function Rosca({ categorias, total }: { categorias: Relatorio['categorias']; total: number }) {
+  if (categorias.length === 0 || total <= 0) return null
+
+  const MAX = 6
+  const ordenadas = [...categorias].sort((a, b) => b.valor - a.valor)
+  const principais = ordenadas.slice(0, MAX)
+  const resto = ordenadas.slice(MAX)
+  const fatias = resto.length
+    ? [...principais, {
+        categoria: `Outras (${resto.length})`,
+        valor: resto.reduce((a, c) => a + c.valor, 0),
+        pct: resto.reduce((a, c) => a + c.pct, 0),
+      }]
+    : principais
+
+  const R = 62, r0 = 38, cx = 74, cy = 74
+  const tom = (i: number) => 0.92 - (i / Math.max(fatias.length - 1, 1)) * 0.62
+
+  let angulo = -Math.PI / 2
+  const arcos = fatias.map((f, i) => {
+    const fracao = f.valor / total
+    const varre = fracao * Math.PI * 2
+    const fim = angulo + varre
+    const grande = varre > Math.PI ? 1 : 0
+    const ponto = (raio: number, a: number) =>
+      `${(cx + raio * Math.cos(a)).toFixed(2)} ${(cy + raio * Math.sin(a)).toFixed(2)}`
+    // Fatia única não fecha com arco: 360° tem início e fim no mesmo ponto.
+    const d = fracao >= 0.999
+      ? `M ${ponto(R, 0)} A ${R} ${R} 0 1 1 ${ponto(R, Math.PI)} A ${R} ${R} 0 1 1 ${ponto(R, 0)} ` +
+        `M ${ponto(r0, 0)} A ${r0} ${r0} 0 1 0 ${ponto(r0, Math.PI)} A ${r0} ${r0} 0 1 0 ${ponto(r0, 0)} Z`
+      : `M ${ponto(R, angulo)} A ${R} ${R} 0 ${grande} 1 ${ponto(R, fim)} ` +
+        `L ${ponto(r0, fim)} A ${r0} ${r0} 0 ${grande} 0 ${ponto(r0, angulo)} Z`
+    angulo = fim
+    return { d, opacidade: tom(i), ...f }
+  })
+
+  return (
+    <div className="flex flex-wrap items-center gap-6">
+      <svg viewBox="0 0 148 148" className="h-[148px] w-[148px] flex-shrink-0" role="img"
+        aria-label="Composição da despesa por categoria">
+        {arcos.map((a, i) => (
+          <path key={i} d={a.d} className="fill-accent" opacity={a.opacidade}
+            fillRule="evenodd" stroke="#fff" strokeWidth="0.75" />
+        ))}
+      </svg>
+
+      <dl className="min-w-[220px] flex-1 space-y-1">
+        {arcos.map((a, i) => (
+          <div key={i} className="flex items-baseline gap-2 text-[12px]">
+            <span className="mt-[3px] h-2.5 w-2.5 flex-shrink-0 rounded-[2px] bg-accent"
+              style={{ opacity: a.opacidade }} />
+            <dt className="flex-1 truncate">{a.categoria}</dt>
+            <dd className="tabular text-subtle">{a.pct.toFixed(1)}%</dd>
+            <dd className="tabular w-24 text-right font-medium">{brl(a.valor)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
 export function Documento({
-  r, escopo, mes, ano, empresas,
+  r, escopo, mes, ano, empresas, identificacao,
 }: {
   r: Relatorio
   escopo?: string | null
@@ -67,8 +170,12 @@ export function Documento({
   mes?: string | null
   ano?: number
   empresas?: { id: string; nome: string }[]
+  /** Só existe no recorte de uma empresa: o consolidado não tem CNPJ único. */
+  identificacao?: { razaoSocial: string; cnpj: string | null; regime: string | null } | null
 }) {
-  const temProjetado = r.serie.some(s => s.projetado > 0)
+  const temProjetado = r.serie.some(s => s.noPeriodo && s.projetado > 0)
+  const emitidoEm = new Date().toLocaleDateString('pt-BR')
+  const assinatura = [escopo ?? 'Synapse Code', r.periodo.rotulo].join(' · ')
 
   return (
     <div className="min-h-screen bg-ground text-fg">
@@ -84,34 +191,37 @@ export function Documento({
 
       <article className="mx-auto max-w-[820px] bg-surface px-10 py-10 print:max-w-none print:px-0 print:py-0">
         {/* ── Capa ── */}
-        <header className="mb-10 border-b-2 border-fg pb-6">
-          <div className="mb-6 flex items-center gap-3">
-            <Image src="/logo.png" alt="" width={36} height={36} className="rounded-lg" />
-            <div>
-              <div className="text-sm font-semibold">{escopo ?? 'Synapse Code'}</div>
-              <div className="text-xs text-subtle">
-                {escopo ? 'Relatório financeiro da empresa' : 'Relatório financeiro consolidado'}
+        <header className="mb-9 border-b-2 border-fg pb-5">
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <Image src="/logo.png" alt="" width={34} height={34} className="rounded-lg" />
+              <div>
+                <div className="text-sm font-semibold leading-tight">
+                  {identificacao?.razaoSocial ?? escopo ?? 'Synapse Code'}
+                </div>
+                {/* Nome de fantasia não identifica ninguém numa prestação de
+                    contas; o CNPJ, sim. No consolidado não há um a declarar. */}
+                <div className="text-[11px] leading-tight text-subtle">
+                  {identificacao
+                    ? [
+                        identificacao.cnpj && `CNPJ ${identificacao.cnpj}`,
+                        identificacao.regime && REGIME_LABEL[identificacao.regime],
+                      ].filter(Boolean).join(' · ')
+                    : 'Consolidado de todas as empresas do grupo'}
+                </div>
               </div>
             </div>
+            <div className="text-right text-[11px] leading-tight text-subtle">
+              <div className="font-medium uppercase tracking-wide">Relatório financeiro</div>
+              <div>Emitido em {emitidoEm}</div>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">{r.periodo.rotulo}</h1>
+
+          <h1 className="mt-6 text-3xl font-bold tracking-tight">{r.periodo.rotulo}</h1>
           <p className="mt-1 text-sm text-muted">
-            Comparado com {r.anterior.rotulo} · emitido em{' '}
-            {new Date().toLocaleDateString('pt-BR')}
+            Comparado com {r.anterior.rotulo}
           </p>
         </header>
-
-        {/* ── Ressalvas ── */}
-        {r.avisos.length > 0 && (
-          <section className="mb-8 rounded border border-warn-line bg-warn-soft px-4 py-3">
-            <h2 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-warn">
-              Observações sobre estes números
-            </h2>
-            <ul className="space-y-1 text-sm text-warn">
-              {r.avisos.map((a, i) => <li key={i}>· {a}</li>)}
-            </ul>
-          </section>
-        )}
 
         {/* ── Sumário executivo ── */}
         <section className="mb-8 break-inside-avoid">
@@ -175,6 +285,9 @@ export function Documento({
           <h2 className="mb-3 border-b border-line pb-1 text-xs font-bold uppercase tracking-wide text-subtle">
             Despesa por categoria
           </h2>
+          <div className="mb-5 break-inside-avoid">
+            <Rosca categorias={r.categorias} total={r.despesa} />
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-[11px] uppercase tracking-wide text-subtle">
@@ -239,7 +352,10 @@ export function Documento({
           </section>
         )}
 
-        {/* ── Maiores lançamentos ── */}
+        {/* ── Maiores lançamentos ──
+            Só quando o anexo é longo demais para servir de destaque: num mês
+            de quinze linhas, o "dez maiores" repete a lista inteira. */}
+        {r.lancamentos.length > 14 && (
         <section className="mb-8">
           <h2 className="mb-3 border-b border-line pb-1 text-xs font-bold uppercase tracking-wide text-subtle">
             Dez maiores lançamentos
@@ -261,16 +377,87 @@ export function Documento({
             </tbody>
           </table>
         </section>
+        )}
 
-        <footer className="border-t border-line pt-4 text-[11px] text-subtle">
-          Synapse Code · Painel Interno · Gerado automaticamente a partir dos lançamentos
-          registrados. Valores em reais.
+        {/* ── Anexo: o razão do período ── */}
+        {r.lancamentos.length > 0 && (
+          <section className="mb-8">
+            <h2 className="mb-3 border-b border-line pb-1 text-xs font-bold uppercase tracking-wide text-subtle">
+              Anexo — lançamentos do período ({r.lancamentos.length})
+            </h2>
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b border-line text-[10px] uppercase tracking-wide text-subtle">
+                  <th className="py-1 text-left font-medium">Data</th>
+                  <th className="py-1 text-left font-medium">Descrição</th>
+                  <th className="py-1 text-left font-medium">Categoria</th>
+                  <th className="py-1 text-right font-medium">Valor (R$)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.lancamentos.map((l, i) => (
+                  <tr key={i} className="border-b border-line/60">
+                    <td className="tabular w-16 py-1 text-subtle">
+                      {new Date(l.data + 'T00:00:00').toLocaleDateString('pt-BR', {
+                        day: '2-digit', month: '2-digit',
+                      })}
+                    </td>
+                    <td className="py-1">{l.descricao}</td>
+                    <td className="py-1 text-subtle">{l.categoria}</td>
+                    <td className="tabular py-1 text-right">{brl(l.valor)}</td>
+                  </tr>
+                ))}
+                <tr className="font-semibold">
+                  <td className="py-1.5" colSpan={3}>Total</td>
+                  <td className="tabular py-1.5 text-right">{brl(r.despesa)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {/* ── Notas ──
+            Saíram da caixa amarela no alto da página. Ali gritavam como alerta
+            de sistema e eram a primeira coisa que se lia; aqui são o que de
+            fato são — as ressalvas de um documento, no lugar onde se procura
+            por elas depois de ver os números. */}
+        {r.avisos.length > 0 && (
+          <section className="mb-8 break-inside-avoid">
+            <h2 className="mb-3 border-b border-line pb-1 text-xs font-bold uppercase tracking-wide text-subtle">
+              Notas
+            </h2>
+            <ol className="space-y-1.5 text-[12px] leading-relaxed text-muted">
+              {r.avisos.map((a, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="tabular flex-shrink-0 text-subtle">{i + 1}.</span>
+                  <span>{a}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        <footer className="border-t border-line pt-4 text-[11px] leading-relaxed text-subtle">
+          <div className="font-medium text-muted">{assinatura}</div>
+          <div>
+            Emitido em {emitidoEm} pelo Painel Interno da Synapse Code, a partir dos
+            lançamentos registrados até a data. Valores em reais (BRL).
+          </div>
         </footer>
+
+        {/* Repetido em toda página impressa: uma folha solta do meio do
+            relatório não diz de quem é nem de quando. */}
+        <div className="hidden print:fixed print:bottom-0 print:left-0 print:right-0 print:block print:text-[8pt] print:text-[#666]">
+          <div className="flex justify-between border-t border-[#ddd] pt-1">
+            <span>{assinatura}</span>
+            <span>Emitido em {emitidoEm}</span>
+          </div>
+        </div>
       </article>
 
       <style>{`
         @media print {
-          @page { size: A4; margin: 16mm 14mm; }
+          @page { size: A4; margin: 16mm 14mm 18mm; }
           html, body { background: #fff !important; }
           /* Impressão sempre no tema claro: fundo escuro come tinta e some no papel. */
           :root {

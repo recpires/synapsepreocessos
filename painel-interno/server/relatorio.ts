@@ -14,7 +14,13 @@ export type LinhaCategoria = {
   variacao: number | null
 }
 
-export type SerieMes = { mes: string; realizado: number; projetado: number }
+export type SerieMes = {
+  mes: string
+  realizado: number
+  projetado: number
+  /** Se o mês pertence ao período do relatório — o resto é contexto. */
+  noPeriodo: boolean
+}
 
 export type Relatorio = {
   periodo: { inicio: string; fim: string; rotulo: string }
@@ -34,6 +40,9 @@ export type Relatorio = {
 
   custoPorProduto: { nome: string; valor: number }[]
   semDono: number
+
+  /** Todos os lançamentos do período, para o anexo. */
+  lancamentos: { data: string; descricao: string; categoria: string; valor: number }[]
 
   burnMensal: number
   saldoTotal: number
@@ -154,12 +163,34 @@ export async function montarRelatorio(
       else atual.projetado += Number(d.valor)
       porMes.set(m, atual)
     }
-    const serie: SerieMes[] = [...porMes.entries()]
+    /*
+     * Doze meses terminando no período, não só o período.
+     *
+     * Um relatório mensal produzia um gráfico de uma barra só — que não é
+     * gráfico, é um número desenhado. A tendência é o que dá sentido ao mês:
+     * R$ 3.409 significa coisas opostas depois de R$ 6.000 ou de R$ 1.200.
+     */
+    const fimSerie = deslocarMes(fim, -1)          // último mês incluído
+    const inicioSerie = deslocarMes(fimSerie, -11)
+    const historico = new Map<string, { realizado: number; projetado: number }>()
+    for (let i = 0; i < 12; i++) {
+      historico.set(deslocarMes(inicioSerie, i).slice(0, 7), { realizado: 0, projetado: 0 })
+    }
+    for (const d of todasDespesas ?? []) {
+      const m = String(d.data).slice(0, 7)
+      const alvo = historico.get(m)
+      if (!alvo) continue
+      if (String(d.data) > hoje) alvo.projetado += Number(d.valor)
+      else alvo.realizado += Number(d.valor)
+    }
+    const dentro = (mes: string) => mes >= inicio.slice(0, 7) && mes < fim.slice(0, 7)
+    const serie: SerieMes[] = [...historico.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([mes, v]) => ({
         mes,
         realizado: Math.round(v.realizado * 100) / 100,
         projetado: Math.round(v.projetado * 100) / 100,
+        noPeriodo: dentro(mes),
       }))
 
     // ── Recorrente mensal equivalente ──
@@ -204,7 +235,7 @@ export async function montarRelatorio(
     if (receita === 0) {
       avisos.push(
         'Nenhuma receita registrada no período. A integração com o Asaas ainda não está ativa, ' +
-        'portanto o resultado abaixo reflete apenas as saídas.'
+        'portanto o resultado apresentado reflete apenas as saídas.'
       )
     }
     const semDono = Math.round((despesa - alocado) * 100) / 100
@@ -228,7 +259,7 @@ export async function montarRelatorio(
         'Aparecem apenas no relatório consolidado.'
       )
     }
-    const temFuturo = serie.some(s => s.projetado > 0)
+    const temFuturo = serie.some(s => s.noPeriodo && s.projetado > 0)
     if (temFuturo) {
       avisos.push(
         'O período inclui lançamentos futuros gerados pelas séries recorrentes. ' +
@@ -258,6 +289,15 @@ export async function montarRelatorio(
         })),
         custoPorProduto,
         semDono,
+        lancamentos: linhas
+          .slice()
+          .sort((a, b) => String(a.data).localeCompare(String(b.data)))
+          .map(d => ({
+            data: String(d.data),
+            descricao: d.descricao,
+            categoria: d.categoria,
+            valor: Number(d.valor),
+          })),
         burnMensal: Math.round(burnMensal * 100) / 100,
         saldoTotal: Math.round(saldoTotal * 100) / 100,
         runwayMeses: saldoTotal > 0 && burnMensal > 0
