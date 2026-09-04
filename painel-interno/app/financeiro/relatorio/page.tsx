@@ -32,8 +32,12 @@ export default async function RelatorioPage({
 
   // O documento é o que sai no PDF: precisa dizer de qual empresa ele fala,
   // senão um relatório de um CNPJ passa por consolidado na mão de terceiro.
-  const emp = (empresas.data ?? []).find(e => e.id === sp.empresa)
-  const escopo = emp ? (emp.nome_fantasia || emp.razao_social) : null
+  const proprias = (empresas.data ?? []).map(e => ({
+    id: e.id,
+    nome: e.nome_fantasia || e.razao_social,
+  }))
+  const emp = proprias.find(e => e.id === sp.empresa)
+  const escopo = emp?.nome ?? null
 
   if (!relatorio.data) {
     return (
@@ -49,6 +53,7 @@ export default async function RelatorioPage({
       escopo={escopo}
       mes={mesDoPeriodo({ inicio, fim })}
       ano={agora.getFullYear()}
+      empresas={proprias}
     />
   )
 }

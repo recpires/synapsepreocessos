@@ -94,6 +94,7 @@ export async function montarRelatorio(
       { data: produtos },
       { data: contas },
       { data: todasDespesas },
+      { data: orfas },
     ] = await Promise.all([
       porEmpresa(sb.from('despesas')
         .select('data, descricao, categoria, valor, recorrente, periodicidade, produto')
@@ -108,6 +109,11 @@ export async function montarRelatorio(
       sb.from('produtos').select('id, nome'),
       porEmpresa(sb.from('contas_bancarias').select('saldo_atual').eq('ativa', true), empresaId),
       porEmpresa(sb.from('despesas').select('data, valor'), empresaId),
+      // Sem `porEmpresa`: é justamente o que o recorte por empresa esconde.
+      empresaId
+        ? sb.from('despesas').select('valor').is('empresa_id', null)
+            .gte('data', inicio).lt('data', fim)
+        : Promise.resolve({ data: [] as { valor: number }[] }),
     ])
     if (e1) return { error: `despesas: ${e1.message}` }
 
@@ -210,6 +216,17 @@ export async function montarRelatorio(
     }
     if (saldoTotal === 0) {
       avisos.push('Nenhuma conta bancária cadastrada — o runway não pôde ser calculado.')
+    }
+    // Um relatório de uma empresa some com o que não tem dono, e o total fica
+    // menor que o gasto real sem nada na página explicando a diferença.
+    const semEmpresa = (orfas ?? []).reduce((a, d) => a + Number(d.valor), 0)
+    if (empresaId && semEmpresa > 0) {
+      avisos.push(
+        `${(orfas ?? []).length} lançamento(s) do período, somando ` +
+        `${semEmpresa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, ` +
+        'não têm empresa atribuída e ficam de fora deste recorte. ' +
+        'Aparecem apenas no relatório consolidado.'
+      )
     }
     const temFuturo = serie.some(s => s.projetado > 0)
     if (temFuturo) {
