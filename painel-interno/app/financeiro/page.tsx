@@ -14,6 +14,8 @@ import SubNav from '@/components/SubNav'
 import { toast, confirmar, escolher } from '@/components/Feedback'
 import { usePersistido, rangePeriodo, PERIODO_LABEL, foraDaJanela, type PeriodoPreset } from '@/lib/filtros'
 import { previsoesACancelar } from '@/lib/assinatura'
+import { periodoDoMes } from '@/lib/periodo-relatorio'
+import Link from 'next/link'
 import { SUBNAV } from '@/lib/nav'
 import {
   type Despesa,
@@ -1553,6 +1555,25 @@ function FinanceiroConteudo() {
                 </button>
               ))}
             </div>
+
+            {/* A rota do relatório existia sem nenhum caminho até ela — só se
+                chegava digitando a URL. O link leva junto o recorte que está
+                na tela, para o documento não abrir falando de outro período. */}
+            <Link
+              href={(() => {
+                const q = new URLSearchParams()
+                if (mesGlobal !== 'geral') {
+                  const p = periodoDoMes(mesGlobal)
+                  q.set('inicio', p.inicio); q.set('fim', p.fim)
+                }
+                if (empresaFiltro) q.set('empresa', empresaFiltro)
+                const s = q.toString()
+                return `/financeiro/relatorio${s ? `?${s}` : ''}`
+              })()}
+              className="rounded-lg border border-[#2d2d3d] bg-[#111118] px-3 py-2 text-sm text-gray-400 transition-colors hover:border-violet-600 hover:text-white"
+            >
+              🖨️ Relatório
+            </Link>
           </div>
         </div>
 

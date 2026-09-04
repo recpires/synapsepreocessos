@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui'
 import type { Relatorio } from '@/server/relatorio'
+import { SeletorPeriodo } from './SeletorPeriodo'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`)
@@ -56,7 +57,15 @@ function Grafico({ serie }: { serie: Relatorio['serie'] }) {
   )
 }
 
-export function Documento({ r, escopo }: { r: Relatorio; escopo?: string | null }) {
+export function Documento({
+  r, escopo, mes, ano,
+}: {
+  r: Relatorio
+  escopo?: string | null
+  /** `YYYY-MM` quando o período é um mês exato; `null` quando é o ano. */
+  mes?: string | null
+  ano?: number
+}) {
   const temProjetado = r.serie.some(s => s.projetado > 0)
 
   return (
@@ -64,7 +73,7 @@ export function Documento({ r, escopo }: { r: Relatorio; escopo?: string | null 
       {/* Barra de ação — some na impressão */}
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-surface px-6 py-3 print:hidden">
         <Link href="/financeiro" className="text-sm text-subtle hover:text-fg">← Financeiro</Link>
-        <span className="text-sm text-muted">Relatório de {r.periodo.rotulo}</span>
+        {ano !== undefined && <SeletorPeriodo mes={mes ?? null} ano={ano} />}
         <Button tamanho="sm" className="ml-auto" onClick={() => window.print()}>
           Gerar PDF
         </Button>

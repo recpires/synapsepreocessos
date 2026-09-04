@@ -1,6 +1,7 @@
 import { Erro } from '@/components/ui'
 import { montarRelatorio } from '@/server/relatorio'
 import { listarEmpresasProprias } from '@/server/empresa-financeiro'
+import { periodoPadrao, mesDoPeriodo } from '@/lib/periodo-relatorio'
 import { Documento } from './Documento'
 
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,9 @@ export const dynamic = 'force-dynamic'
 /**
  * Rota de relatório. Fica fora do PainelShell de propósito: o que aparece na
  * tela é exatamente o que sai no PDF, sem sidebar nem navegação.
+ *
+ * O período vem da URL, então cada recorte tem link próprio — dá para mandar
+ * "o relatório de setembro" para alguém sem explicar quais botões apertar.
  */
 export default async function RelatorioPage({
   searchParams,
@@ -16,10 +20,10 @@ export default async function RelatorioPage({
 }) {
   const sp = await searchParams
   const agora = new Date()
+  const padrao = periodoPadrao(agora)
 
-  // Padrão: ano corrente até o primeiro dia do mês que vem.
-  const inicio = sp.inicio ?? `${agora.getFullYear()}-01-01`
-  const fim = sp.fim ?? `${agora.getFullYear()}-${String(agora.getMonth() + 2).padStart(2, '0')}-01`
+  const inicio = sp.inicio ?? padrao.inicio
+  const fim = sp.fim ?? padrao.fim
 
   const [relatorio, empresas] = await Promise.all([
     montarRelatorio(inicio, fim, sp.empresa),
@@ -39,5 +43,12 @@ export default async function RelatorioPage({
     )
   }
 
-  return <Documento r={relatorio.data} escopo={escopo} />
+  return (
+    <Documento
+      r={relatorio.data}
+      escopo={escopo}
+      mes={mesDoPeriodo({ inicio, fim })}
+      ano={agora.getFullYear()}
+    />
+  )
 }
